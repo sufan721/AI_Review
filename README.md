@@ -121,8 +121,9 @@ npm --prefix frontend install
 npm --prefix frontend run dev
 ```
 
-已交付：统一 API 响应与异常处理、健康检查、账户注册与登录（JWT + BCrypt）、登录态路由守卫，
-以及 MySQL 与 Milvus 的本地依赖。笔记、文件、知识库、索引和模型调用将作为后续独立功能交付。
+已交付：统一 API 响应与异常处理、健康检查、账户注册与登录（JWT + BCrypt）、登录态路由守卫、
+笔记 CRUD（置顶、归档、分页）与 Markdown 双栏编辑器（渲染时关闭原生 HTML，避免 XSS），
+以及 MySQL 与 Milvus 的本地依赖。标签与搜索、文件、知识库、索引和模型调用将作为后续独立功能交付。
 
 ## 测试
 

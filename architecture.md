@@ -94,7 +94,6 @@ CREATE TABLE `user` (
   `username`      VARCHAR(64)  NOT NULL COMMENT '登录名',
   `password_hash` VARCHAR(100) NOT NULL COMMENT 'BCrypt 哈希',
   `nickname`      VARCHAR(64)  DEFAULT NULL COMMENT '昵称',
-  `avatar`        VARCHAR(255) DEFAULT NULL COMMENT '头像 URL',
   `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -103,16 +102,18 @@ CREATE TABLE `user` (
 
 -- 笔记
 CREATE TABLE `note` (
-  `id`          BIGINT       NOT NULL AUTO_INCREMENT,
-  `user_id`     BIGINT       NOT NULL COMMENT '所属用户',
-  `title`       VARCHAR(255) NOT NULL DEFAULT '' COMMENT '标题',
-  `content`     LONGTEXT     COMMENT 'Markdown 正文',
-  `is_pinned`   TINYINT      NOT NULL DEFAULT 0 COMMENT '是否置顶 0/1',
-  `is_archived` TINYINT      NOT NULL DEFAULT 0 COMMENT '是否归档 0/1',
-  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `id`              BIGINT       NOT NULL AUTO_INCREMENT,
+  `user_id`         BIGINT       NOT NULL COMMENT '所属用户',
+  `title`           VARCHAR(255) NOT NULL DEFAULT '' COMMENT '标题',
+  `content`         LONGTEXT     COMMENT 'Markdown 正文',
+  `is_pinned`       TINYINT      NOT NULL DEFAULT 0 COMMENT '是否置顶 0/1',
+  `is_archived`     TINYINT      NOT NULL DEFAULT 0 COMMENT '是否归档 0/1',
+  `content_version` INT          NOT NULL DEFAULT 1 COMMENT '内容版本，正文变更时递增',
+  `index_status`    VARCHAR(16)  NOT NULL DEFAULT 'PENDING' COMMENT '索引状态 PENDING/INDEXED/FAILED',
+  `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_user_updated` (`user_id`, `updated_at`)
+  KEY `idx_user_archived_pinned` (`user_id`, `is_archived`, `is_pinned`, `updated_at`)
 ) ENGINE=InnoDB COMMENT='笔记';
 
 -- 标签
@@ -166,6 +167,7 @@ CREATE TABLE `user_theme` (
 ### 3.3 关系说明
 
 - `note.user_id → user.id`：一个用户多篇笔记。
+- `note.content_version` / `note.index_status`：正文每次有效变更时 `content_version` 递增并把 `index_status` 置回 `PENDING`，索引侧据此判断已有切片是否过期（见 6.4）。
 - `note_tag`：笔记与标签的**多对多**关联。
 - `share.note_id → note.id`：一篇笔记可生成多个分享链接。
 

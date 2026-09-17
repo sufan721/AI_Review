@@ -67,6 +67,13 @@ export function put<T>(path: string, payload?: unknown): Promise<T> {
   return request<T>(path, { method: 'PUT', body: payload === undefined ? undefined : JSON.stringify(payload) })
 }
 
+export function patch<T>(path: string, payload?: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PATCH',
+    body: payload === undefined ? undefined : JSON.stringify(payload),
+  })
+}
+
 export function del<T>(path: string): Promise<T> {
   return request<T>(path, { method: 'DELETE' })
 }
