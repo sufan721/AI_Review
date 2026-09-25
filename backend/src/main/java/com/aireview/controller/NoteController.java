@@ -54,6 +54,11 @@ public class NoteController {
         return Result.ok(null);
     }
 
+    @PostMapping("/{id}/reindex")
+    public Result<NoteVO> reindex(@PathVariable Long id) {
+        return Result.ok(noteService.reindex(id));
+    }
+
     @PatchMapping("/{id}/pin")
     public Result<NoteVO> togglePinned(@PathVariable Long id) {
         return Result.ok(noteService.togglePinned(id));

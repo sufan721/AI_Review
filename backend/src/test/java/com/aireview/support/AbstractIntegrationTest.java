@@ -3,8 +3,12 @@ package com.aireview.support;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MySQLContainer;
@@ -27,8 +31,30 @@ import org.testcontainers.utility.MountableFile;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(IndexingTestConfig.class)
 public abstract class AbstractIntegrationTest {
     private static final String CONTAINER_SCHEMA_PATH = "/docker-entrypoint-initdb.d/01-schema.sql";
+
+    @Autowired
+    private ControlledTaskExecutor taskExecutor;
+
+    @Autowired
+    private InMemoryVectorStore vectorStore;
+
+    @Autowired
+    private FakeEmbeddingClient embeddingClient;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    /** 每个用例前清空索引测试双与切片表，保证索引状态跨测试隔离。 */
+    @BeforeEach
+    void resetIndexing() {
+        taskExecutor.clear();
+        vectorStore.clear();
+        embeddingClient.setFail(false);
+        jdbcTemplate.execute("TRUNCATE TABLE `document_chunk`");
+    }
 
     private static final String EXTERNAL_DB_URL = System.getenv("TEST_DB_URL");
 

@@ -1,4 +1,4 @@
-import { del, request } from './request'
+import { del, post, request } from './request'
 import type { PageResult } from '../types/api'
 import type { Document, DocumentSummary } from '../types/document'
 
@@ -11,4 +11,5 @@ export const documentApi = {
     return request<Document>('/api/documents', { method: 'POST', body: form })
   },
   remove: (id: number) => del<null>(`/api/documents/${id}`),
+  reindex: (id: number) => post<Document>(`/api/documents/${id}/reindex`),
 }

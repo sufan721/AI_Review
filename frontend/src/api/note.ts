@@ -20,4 +20,5 @@ export const noteApi = {
   remove: (id: number) => del<null>(`/api/notes/${id}`),
   togglePin: (id: number) => patch<Note>(`/api/notes/${id}/pin`),
   toggleArchive: (id: number) => patch<Note>(`/api/notes/${id}/archive`),
+  reindex: (id: number) => post<Note>(`/api/notes/${id}/reindex`),
 }

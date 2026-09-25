@@ -9,6 +9,7 @@ public record NoteSummaryVO(
     Boolean isPinned,
     Boolean isArchived,
     String indexStatus,
+    String indexError,
     LocalDateTime updatedAt
 ) {
 }

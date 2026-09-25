@@ -52,6 +52,11 @@ export const useNotesStore = defineStore('notes', () => {
     await fetchList()
   }
 
+  async function reindex(id: number): Promise<void> {
+    await noteApi.reindex(id)
+    await fetchList()
+  }
+
   function reset(): void {
     list.value = []
     total.value = 0
@@ -59,5 +64,5 @@ export const useNotesStore = defineStore('notes', () => {
     current.value = null
   }
 
-  return { list, total, query, current, loading, fetchList, fetchOne, save, remove, togglePin, toggleArchive, reset }
+  return { list, total, query, current, loading, fetchList, fetchOne, save, remove, togglePin, toggleArchive, reindex, reset }
 })

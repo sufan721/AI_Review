@@ -7,6 +7,7 @@ export type NoteSummary = {
   isPinned: boolean
   isArchived: boolean
   indexStatus: IndexStatus
+  indexError?: string
   updatedAt: string
 }
 
@@ -18,6 +19,7 @@ export type Note = {
   isArchived: boolean
   contentVersion: number
   indexStatus: IndexStatus
+  indexError?: string
   createdAt: string
   updatedAt: string
 }

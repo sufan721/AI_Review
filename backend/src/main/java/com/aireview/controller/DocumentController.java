@@ -51,4 +51,9 @@ public class DocumentController {
         documentService.delete(id);
         return Result.ok(null);
     }
+
+    @PostMapping("/{id}/reindex")
+    public Result<DocumentVO> reindex(@PathVariable Long id) {
+        return Result.ok(documentService.reindex(id));
+    }
 }

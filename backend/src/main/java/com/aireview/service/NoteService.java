@@ -18,6 +18,8 @@ public interface NoteService {
 
     void delete(Long id);
 
+    NoteVO reindex(Long id);
+
     NoteVO togglePinned(Long id);
 
     NoteVO toggleArchived(Long id);

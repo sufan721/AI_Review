@@ -8,20 +8,28 @@ const emit = defineEmits<{
   togglePin: [id: number]
   toggleArchive: [id: number]
   remove: [note: NoteSummary]
+  reindex: [id: number]
 }>()
 </script>
 
 <template>
   <li class="item">
-    <button class="main" type="button" @click="emit('open', note.id)">
-      <span class="title">
-        <span v-if="note.isPinned" class="badge badge-pin">置顶</span>
-        <span v-if="note.isArchived" class="badge">已归档</span>
-        <span :class="['text', { untitled: note.title === '' }]">{{ note.title === '' ? '无标题' : note.title }}</span>
-      </span>
-      <span class="time">{{ note.updatedAt }}</span>
-    </button>
+    <div class="main-wrap">
+      <button class="main" type="button" @click="emit('open', note.id)">
+        <span class="title">
+          <span v-if="note.isPinned" class="badge badge-pin">置顶</span>
+          <span v-if="note.isArchived" class="badge">已归档</span>
+          <span v-if="note.indexStatus === 'FAILED'" class="badge badge-failed">索引失败</span>
+          <span :class="['text', { untitled: note.title === '' }]">{{ note.title === '' ? '无标题' : note.title }}</span>
+        </span>
+        <span class="time">{{ note.updatedAt }}</span>
+      </button>
+      <p v-if="note.indexStatus === 'FAILED' && note.indexError" class="index-error">{{ note.indexError }}</p>
+    </div>
     <div class="actions">
+      <button v-if="note.indexStatus === 'FAILED'" class="btn" type="button" @click="emit('reindex', note.id)">
+        重试索引
+      </button>
       <button class="btn" type="button" @click="emit('togglePin', note.id)">
         {{ note.isPinned ? '取消置顶' : '置顶' }}
       </button>
@@ -44,8 +52,15 @@ const emit = defineEmits<{
   background: var(--bg);
 }
 
-.main {
+.main-wrap {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.main {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -86,6 +101,18 @@ const emit = defineEmits<{
 .badge-pin {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.badge-failed {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.index-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12px;
+  word-break: break-all;
 }
 
 .time {

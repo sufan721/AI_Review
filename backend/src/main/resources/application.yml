@@ -21,3 +21,19 @@ jwt:
 
 server:
   port: ${SERVER_PORT:8080}
+
+ai-review:
+  index:
+    chunk:
+      max-size: ${INDEX_CHUNK_MAX_SIZE:800}
+      overlap: ${INDEX_CHUNK_OVERLAP:100}
+    embedding:
+      base-url: ${INDEX_EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com}
+      api-key: ${INDEX_EMBEDDING_API_KEY:}
+      model: ${INDEX_EMBEDDING_MODEL:text-embedding-v4}
+    milvus:
+      host: ${MILVUS_HOST:localhost}
+      port: ${MILVUS_PORT:19530}
+      collection: ${MILVUS_COLLECTION:memo_chunks}
+      dimension: ${MILVUS_DIMENSION:1024}
+      timeout-ms: ${MILVUS_TIMEOUT_MS:10000}

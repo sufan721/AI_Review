@@ -9,6 +9,8 @@ import com.aireview.dto.NoteSummaryVO;
 import com.aireview.dto.NoteUpdateRequest;
 import com.aireview.dto.NoteVO;
 import com.aireview.entity.Note;
+import com.aireview.index.IndexingService;
+import com.aireview.index.ResourceType;
 import com.aireview.mapper.NoteMapper;
 import com.aireview.service.NoteService;
 import com.aireview.util.UserContext;
@@ -26,9 +28,11 @@ public class NoteServiceImpl implements NoteService {
     private static final String INDEX_STATUS_PENDING = "PENDING";
 
     private final NoteMapper noteMapper;
+    private final IndexingService indexingService;
 
-    public NoteServiceImpl(NoteMapper noteMapper) {
+    public NoteServiceImpl(NoteMapper noteMapper, IndexingService indexingService) {
         this.noteMapper = noteMapper;
+        this.indexingService = indexingService;
     }
 
     @Override
@@ -55,6 +59,7 @@ public class NoteServiceImpl implements NoteService {
         note.setTitle(normalizeTitle(request.title()));
         note.setContent(request.content() == null ? "" : request.content());
         noteMapper.insert(note);
+        indexingService.schedule(ResourceType.NOTE, note.getId());
         // 回读以拿到数据库生成的时间戳与默认值
         return toVO(noteMapper.selectById(note.getId()));
     }
@@ -66,21 +71,37 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public NoteVO update(Long id, NoteUpdateRequest request) {
-        return mutate(id, note -> {
-            note.setTitle(normalizeTitle(request.title()));
-            String content = request.content() == null ? "" : request.content();
-            if (!Objects.equals(note.getContent(), content)) {
-                note.setContent(content);
-                note.setContentVersion(note.getContentVersion() + 1);
-                note.setIndexStatus(INDEX_STATUS_PENDING);
-            }
-        });
+        Note note = loadOwned(id);
+        String content = request.content() == null ? "" : request.content();
+        boolean contentChanged = !Objects.equals(note.getContent(), content);
+        note.setTitle(normalizeTitle(request.title()));
+        if (contentChanged) {
+            note.setContent(content);
+            note.setContentVersion(note.getContentVersion() + 1);
+            note.setIndexStatus(INDEX_STATUS_PENDING);
+        }
+        // 置空时间戳，让数据库的 ON UPDATE CURRENT_TIMESTAMP 生效而不是写回旧值
+        note.setCreatedAt(null);
+        note.setUpdatedAt(null);
+        noteMapper.updateById(note);
+        if (contentChanged) {
+            indexingService.schedule(ResourceType.NOTE, id);
+        }
+        return toVO(noteMapper.selectById(id));
     }
 
     @Override
     public void delete(Long id) {
         Note note = loadOwned(id);
         noteMapper.deleteById(note.getId());
+        indexingService.deleteResource(ResourceType.NOTE, id);
+    }
+
+    @Override
+    public NoteVO reindex(Long id) {
+        loadOwned(id);
+        indexingService.reindex(ResourceType.NOTE, id);
+        return toVO(noteMapper.selectById(id));
     }
 
     @Override
@@ -123,12 +144,12 @@ public class NoteServiceImpl implements NoteService {
 
     private NoteSummaryVO toSummary(Note note) {
         return new NoteSummaryVO(note.getId(), note.getTitle(), note.getIsPinned(), note.getIsArchived(),
-            note.getIndexStatus(), note.getUpdatedAt());
+            note.getIndexStatus(), note.getIndexError(), note.getUpdatedAt());
     }
 
     private NoteVO toVO(Note note) {
         return new NoteVO(note.getId(), note.getTitle(), note.getContent(), note.getIsPinned(),
-            note.getIsArchived(), note.getContentVersion(), note.getIndexStatus(), note.getCreatedAt(),
-            note.getUpdatedAt());
+            note.getIsArchived(), note.getContentVersion(), note.getIndexStatus(), note.getIndexError(),
+            note.getCreatedAt(), note.getUpdatedAt());
     }
 }

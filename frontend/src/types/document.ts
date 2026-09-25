@@ -4,6 +4,7 @@ export interface DocumentSummary {
   fileSize: number
   contentVersion: number
   indexStatus: string
+  indexError?: string
   createdAt: string
   updatedAt: string
 }

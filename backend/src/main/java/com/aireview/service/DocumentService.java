@@ -13,4 +13,6 @@ public interface DocumentService {
     DocumentVO detail(Long id);
 
     void delete(Long id);
+
+    DocumentVO reindex(Long id);
 }
