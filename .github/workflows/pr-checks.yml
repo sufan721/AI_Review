@@ -1,0 +1,88 @@
+﻿name: PR checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: write
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  dependencies:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    steps:
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  metadata:
+    name: Validate PR metadata
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check title and description
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = context.payload.pull_request.title;
+            const body = context.payload.pull_request.body || '';
+            const titlePattern = /^(feat|fix|docs|refactor|perf|test|style|chore): .+/;
+            if (!titlePattern.test(title)) {
+              core.setFailed('PR title must use <type>: <description>');
+            }
+            for (const section of ['## What changed', '## How to verify', '## Self-check']) {
+              if (!body.includes(section)) {
+                core.setFailed(`PR description is missing required section: ${section}`);
+              }
+            }
+
+  diff:
+    name: Check patch hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check whitespace errors
+        run: git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+      - name: Check for committed secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Run Maven tests
+        run: mvn -B -f backend/pom.xml test
+
+  frontend:
+    name: Frontend tests and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci --prefix frontend
+      - name: Run tests
+        run: npm run test --prefix frontend -- --run
+      - name: Build application
+        run: npm run build --prefix frontend
