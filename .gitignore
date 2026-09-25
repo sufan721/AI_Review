@@ -4,3 +4,32 @@ backend/target/
 frontend/node_modules/
 frontend/dist/
 .obsidian/
+# Local dependency caches
+.m2/
+**/.m2/
+
+# Java / Maven build outputs
+**/target/
+*.class
+
+# Frontend dependencies and build outputs
+**/node_modules/
+**/dist/
+
+# Local environment and secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
+
+# IDE metadata
+.idea/
+.vscode/
+*.iml
