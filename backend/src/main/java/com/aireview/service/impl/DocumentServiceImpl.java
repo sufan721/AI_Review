@@ -6,6 +6,8 @@ import com.aireview.common.ResultCode;
 import com.aireview.dto.DocumentSummaryVO;
 import com.aireview.dto.DocumentVO;
 import com.aireview.entity.Document;
+import com.aireview.index.IndexingService;
+import com.aireview.index.ResourceType;
 import com.aireview.mapper.DocumentMapper;
 import com.aireview.service.DocumentService;
 import com.aireview.util.UserContext;
@@ -23,9 +25,11 @@ public class DocumentServiceImpl implements DocumentService {
     private static final String INDEX_STATUS_PENDING = "PENDING";
 
     private final DocumentMapper documentMapper;
+    private final IndexingService indexingService;
 
-    public DocumentServiceImpl(DocumentMapper documentMapper) {
+    public DocumentServiceImpl(DocumentMapper documentMapper, IndexingService indexingService) {
         this.documentMapper = documentMapper;
+        this.indexingService = indexingService;
     }
 
     @Override
@@ -53,6 +57,7 @@ public class DocumentServiceImpl implements DocumentService {
             throw new BusinessException(ResultCode.BAD_REQUEST, "无法读取 Markdown 文件");
         }
         documentMapper.insert(document);
+        indexingService.schedule(ResourceType.DOCUMENT, document.getId());
         return toVO(documentMapper.selectById(document.getId()));
     }
 
@@ -64,6 +69,14 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public void delete(Long id) {
         documentMapper.deleteById(loadOwned(id).getId());
+        indexingService.deleteResource(ResourceType.DOCUMENT, id);
+    }
+
+    @Override
+    public DocumentVO reindex(Long id) {
+        loadOwned(id);
+        indexingService.reindex(ResourceType.DOCUMENT, id);
+        return toVO(documentMapper.selectById(id));
     }
 
     private void validate(MultipartFile file) {
@@ -91,11 +104,13 @@ public class DocumentServiceImpl implements DocumentService {
 
     private DocumentSummaryVO toSummary(Document document) {
         return new DocumentSummaryVO(document.getId(), document.getFileName(), document.getFileSize(),
-            document.getContentVersion(), document.getIndexStatus(), document.getCreatedAt(), document.getUpdatedAt());
+            document.getContentVersion(), document.getIndexStatus(), document.getIndexError(),
+            document.getCreatedAt(), document.getUpdatedAt());
     }
 
     private DocumentVO toVO(Document document) {
         return new DocumentVO(document.getId(), document.getFileName(), document.getContent(), document.getFileSize(),
-            document.getContentVersion(), document.getIndexStatus(), document.getCreatedAt(), document.getUpdatedAt());
+            document.getContentVersion(), document.getIndexStatus(), document.getIndexError(),
+            document.getCreatedAt(), document.getUpdatedAt());
     }
 }

@@ -10,6 +10,7 @@ public record NoteVO(
     Boolean isArchived,
     Integer contentVersion,
     String indexStatus,
+    String indexError,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {

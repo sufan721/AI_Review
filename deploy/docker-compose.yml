@@ -40,10 +40,17 @@ services:
       DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}
       DB_USERNAME: ${MYSQL_USER}
       DB_PASSWORD: ${MYSQL_PASSWORD}
+      MILVUS_HOST: ${MILVUS_HOST:-milvus}
+      MILVUS_PORT: ${MILVUS_PORT:-19530}
+      MILVUS_COLLECTION: ${MILVUS_COLLECTION:-memo_chunks}
+      MILVUS_DIMENSION: ${MILVUS_DIMENSION:-1024}
+      INDEX_EMBEDDING_API_KEY: ${INDEX_EMBEDDING_API_KEY:-}
     ports: ["${BACKEND_PORT:-8080}:8080"]
     depends_on:
       mysql:
         condition: service_healthy
+      milvus:
+        condition: service_started
   frontend:
     build:
       context: ../frontend

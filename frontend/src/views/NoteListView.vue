@@ -102,6 +102,7 @@ async function remove(note: NoteSummary): Promise<void> {
         @open="open"
         @toggle-pin="(id) => run(() => notes.togglePin(id))"
         @toggle-archive="(id) => run(() => notes.toggleArchive(id))"
+        @reindex="(id) => run(() => notes.reindex(id))"
         @remove="remove"
       />
     </ul>

@@ -18,6 +18,10 @@ public class Document {
     private Long fileSize;
     private Integer contentVersion;
     private String indexStatus;
+    /** 最近一次索引失败原因，仅在 indexStatus = FAILED 时有值。 */
+    private String indexError;
+    /** 索引重试次数。 */
+    private Integer retryCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

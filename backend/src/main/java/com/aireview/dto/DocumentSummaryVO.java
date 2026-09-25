@@ -8,6 +8,7 @@ public record DocumentSummaryVO(
     Long fileSize,
     Integer contentVersion,
     String indexStatus,
+    String indexError,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {

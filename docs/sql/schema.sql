@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS `note` (
   `is_archived`     TINYINT      NOT NULL DEFAULT 0 COMMENT '是否归档 0/1',
   `content_version` INT          NOT NULL DEFAULT 1 COMMENT '内容版本，正文变更时递增',
   `index_status`    VARCHAR(16)  NOT NULL DEFAULT 'PENDING' COMMENT '索引状态 PENDING/INDEXED/FAILED',
+  `index_error`     VARCHAR(500) DEFAULT NULL COMMENT '最近一次索引失败原因',
+  `retry_count`     INT          NOT NULL DEFAULT 0 COMMENT '索引重试次数',
   `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -43,8 +45,28 @@ CREATE TABLE IF NOT EXISTS `document` (
   `file_size`       BIGINT       NOT NULL COMMENT '字节数',
   `content_version` INT          NOT NULL DEFAULT 1 COMMENT '内容版本',
   `index_status`    VARCHAR(16)  NOT NULL DEFAULT 'PENDING' COMMENT '索引状态',
+  `index_error`     VARCHAR(500) DEFAULT NULL COMMENT '最近一次索引失败原因',
+  `retry_count`     INT          NOT NULL DEFAULT 0 COMMENT '索引重试次数',
   `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_document_user_updated` (`user_id`, `updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Markdown 文件';
+
+-- 资料切片（笔记与 Markdown 文件共用）
+CREATE TABLE IF NOT EXISTS `document_chunk` (
+  `id`              BIGINT      NOT NULL AUTO_INCREMENT,
+  `user_id`         BIGINT      NOT NULL COMMENT '所属用户（冗余，便于校验与清理）',
+  `resource_type`   VARCHAR(16) NOT NULL COMMENT '资料类型 note/document',
+  `resource_id`     BIGINT      NOT NULL COMMENT '资料 ID',
+  `content_version` INT         NOT NULL COMMENT '内容版本',
+  `chunk_index`     INT         NOT NULL COMMENT '切片序号，从 0 开始',
+  `content`         TEXT        NOT NULL COMMENT '切片文本',
+  `position_start`  INT         NOT NULL COMMENT '切片在清洗后正文中的起始字符位置',
+  `position_end`    INT         NOT NULL COMMENT '切片在清洗后正文中的结束字符位置（开区间）',
+  `content_hash`    CHAR(64)    NOT NULL COMMENT '切片内容 SHA-256，用于幂等比对',
+  `created_at`      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_resource_version_chunk` (`resource_type`, `resource_id`, `content_version`, `chunk_index`),
+  KEY `idx_resource` (`resource_type`, `resource_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资料切片';

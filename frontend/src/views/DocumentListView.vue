@@ -54,6 +54,16 @@ async function remove(document: DocumentSummary): Promise<void> {
   }
 }
 
+async function reindex(document: DocumentSummary): Promise<void> {
+  error.value = ''
+  try {
+    await documentApi.reindex(document.id)
+    await load()
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : '重试索引失败'
+  }
+}
+
 function formatSize(size: number): string {
   return size < 1024 ? `${size} B` : `${(size / 1024).toFixed(1)} KB`
 }
@@ -82,6 +92,12 @@ onMounted(load)
           <button class="file" type="button" @click="openDocument(document)">
             <strong>{{ document.fileName }}</strong>
             <span>{{ formatSize(document.fileSize) }} · {{ document.indexStatus }}</span>
+            <span v-if="document.indexStatus === 'FAILED' && document.indexError" class="fail-reason" :title="document.indexError">
+              {{ document.indexError }}
+            </span>
+          </button>
+          <button v-if="document.indexStatus === 'FAILED'" class="btn" type="button" @click="reindex(document)">
+            重试索引
           </button>
           <button class="btn danger" type="button" @click="remove(document)">删除</button>
         </li>
@@ -105,6 +121,7 @@ h1 { margin: 0; font-size: 22px; } h2 { margin: 0 0 12px; font-size: 18px; }
 .file { flex: 1; min-width: 0; border: 0; background: transparent; text-align: left; color: var(--fg); padding: 4px; }
 .file strong, .file span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file span { color: var(--fg-muted); font-size: 12px; margin-top: 2px; } .danger { color: var(--danger); padding: 4px 8px; }
+.file .fail-reason { color: var(--danger); }
 .preview { border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; overflow: auto; background: var(--bg-soft); }
 pre { white-space: pre-wrap; font: inherit; line-height: 1.6; margin: 0; } .preview-empty, .empty { padding: 48px 0; text-align: center; }
 @media (max-width: 720px) { .workspace { grid-template-columns: 1fr; } .head { align-items: flex-start; flex-direction: column; } }
