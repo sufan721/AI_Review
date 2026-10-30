@@ -17,17 +17,28 @@ import org.springframework.web.client.RestClient;
  */
 public class QianwenEmbeddingClient implements EmbeddingClient {
     private static final String EMBED_PATH = "/api/v1/services/embeddings/text-embedding/text-embedding";
+    private static final int DEFAULT_BATCH_SIZE = 10;
 
     private final RestClient restClient;
     private final String apiKey;
     private final String model;
     private final ObjectMapper objectMapper;
+    private final int batchSize;
 
     public QianwenEmbeddingClient(String baseUrl, String apiKey, String model, ObjectMapper objectMapper) {
+        this(baseUrl, apiKey, model, objectMapper, DEFAULT_BATCH_SIZE);
+    }
+
+    public QianwenEmbeddingClient(String baseUrl, String apiKey, String model, ObjectMapper objectMapper,
+        int batchSize) {
+        if (batchSize <= 0) {
+            throw new IllegalArgumentException("batchSize 必须为正数");
+        }
         this.restClient = RestClient.builder().baseUrl(baseUrl).build();
         this.apiKey = apiKey;
         this.model = model;
         this.objectMapper = objectMapper;
+        this.batchSize = batchSize;
     }
 
     @Override
@@ -35,6 +46,15 @@ public class QianwenEmbeddingClient implements EmbeddingClient {
         if (texts == null || texts.isEmpty()) {
             return List.of();
         }
+        List<float[]> result = new ArrayList<>(texts.size());
+        for (int from = 0; from < texts.size(); from += batchSize) {
+            int to = Math.min(from + batchSize, texts.size());
+            result.addAll(embedBatch(texts.subList(from, to)));
+        }
+        return result;
+    }
+
+    private List<float[]> embedBatch(List<String> texts) {
         ObjectNode body = objectMapper.createObjectNode();
         body.put("model", model);
         ArrayNode textsNode = body.putObject("input").putArray("texts");

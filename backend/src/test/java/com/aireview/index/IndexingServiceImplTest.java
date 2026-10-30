@@ -1,6 +1,7 @@
 package com.aireview.index;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -43,7 +44,7 @@ class IndexingServiceImplTest {
         service.indexNow(ResourceType.NOTE, 1, 42);
 
         verifyNoInteractions(embeddingClient, chunkMapper, vectorStore);
-        verify(repository, never()).markIndexed(any(), anyLong());
+        verify(repository, never()).markIndexed(any(), anyLong(), anyInt());
     }
 
     @Test
@@ -71,7 +72,7 @@ class IndexingServiceImplTest {
         verify(chunkMapper).delete(any());
         verify(chunkMapper, times(2)).insert(any(DocumentChunk.class));
         verify(vectorStore).replace(eq(ResourceType.NOTE), eq(1L), any());
-        verify(repository).markIndexed(ResourceType.NOTE, 1);
+        verify(repository).markIndexed(ResourceType.NOTE, 1, 1);
     }
 
     @Test
@@ -83,7 +84,7 @@ class IndexingServiceImplTest {
 
         verify(vectorStore).delete(ResourceType.NOTE, 1);
         verify(vectorStore, never()).replace(any(), anyLong(), any());
-        verify(repository).markIndexed(ResourceType.NOTE, 1);
+        verify(repository).markIndexed(ResourceType.NOTE, 1, 1);
     }
 
     @Test
@@ -94,8 +95,8 @@ class IndexingServiceImplTest {
 
         service.indexNow(ResourceType.NOTE, 1, 42);
 
-        verify(repository).markFailed(ResourceType.NOTE, 1, "嵌入服务不可用");
-        verify(repository, never()).markIndexed(any(), anyLong());
+        verify(repository).markFailed(ResourceType.NOTE, 1, 1, "嵌入服务不可用");
+        verify(repository, never()).markIndexed(any(), anyLong(), anyInt());
     }
 
     @Test

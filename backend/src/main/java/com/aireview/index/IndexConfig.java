@@ -35,8 +35,9 @@ public class IndexConfig {
         @Value("${ai-review.index.embedding.base-url:https://dashscope.aliyuncs.com}") String baseUrl,
         @Value("${ai-review.index.embedding.api-key:}") String apiKey,
         @Value("${ai-review.index.embedding.model:text-embedding-v4}") String model,
+        @Value("${ai-review.index.embedding.batch-size:10}") int batchSize,
         ObjectMapper objectMapper) {
-        return new QianwenEmbeddingClient(baseUrl, apiKey, model, objectMapper);
+        return new QianwenEmbeddingClient(baseUrl, apiKey, model, objectMapper, batchSize);
     }
 
     @Bean

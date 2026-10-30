@@ -7,9 +7,11 @@ public interface IndexResourceRepository {
     /** 按 id 与 userId 读取资料；不存在或非本人返回 null。 */
     IndexResource load(ResourceType type, long resourceId, long userId);
 
-    void markIndexed(ResourceType type, long resourceId);
+    /** Mark only when the resource is still at the version that was indexed. */
+    void markIndexed(ResourceType type, long resourceId, int contentVersion);
 
-    void markFailed(ResourceType type, long resourceId, String reason);
+    /** Record failure only when the resource is still at the version that failed. */
+    void markFailed(ResourceType type, long resourceId, int contentVersion, String reason);
 
     void markPending(ResourceType type, long resourceId);
 }

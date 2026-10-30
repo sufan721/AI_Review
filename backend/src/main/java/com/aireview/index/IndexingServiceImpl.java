@@ -83,13 +83,13 @@ public class IndexingServiceImpl implements IndexingService {
             } else {
                 vectorStore.replace(type, resourceId, records);
             }
-            repository.markIndexed(type, resourceId);
+            repository.markIndexed(type, resourceId, resource.contentVersion());
         } catch (Exception exception) {
             String reason = exception instanceof IndexingException
                 ? exception.getMessage() : "索引失败: " + exception.getMessage();
             log.warn("资料索引失败 type={} id={} version={}: {}", type, resourceId,
                 resource.contentVersion(), reason);
-            repository.markFailed(type, resourceId, reason);
+            repository.markFailed(type, resourceId, resource.contentVersion(), reason);
         }
     }
 

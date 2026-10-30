@@ -31,6 +31,7 @@ ai-review:
       base-url: ${INDEX_EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com}
       api-key: ${INDEX_EMBEDDING_API_KEY:}
       model: ${INDEX_EMBEDDING_MODEL:text-embedding-v4}
+      batch-size: ${INDEX_EMBEDDING_BATCH_SIZE:10}
     milvus:
       host: ${MILVUS_HOST:localhost}
       port: ${MILVUS_PORT:19530}

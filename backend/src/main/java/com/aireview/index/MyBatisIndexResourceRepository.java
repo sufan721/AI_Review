@@ -39,30 +39,34 @@ public class MyBatisIndexResourceRepository implements IndexResourceRepository {
     }
 
     @Override
-    public void markIndexed(ResourceType type, long resourceId) {
+    public void markIndexed(ResourceType type, long resourceId, int contentVersion) {
         if (type == ResourceType.NOTE) {
             noteMapper.update(null, Wrappers.<Note>lambdaUpdate().eq(Note::getId, resourceId)
+                .eq(Note::getContentVersion, contentVersion)
                 .set(Note::getIndexStatus, INDEXED)
                 .set(Note::getIndexError, null)
                 .set(Note::getRetryCount, 0));
             return;
         }
         documentMapper.update(null, Wrappers.<Document>lambdaUpdate().eq(Document::getId, resourceId)
+            .eq(Document::getContentVersion, contentVersion)
             .set(Document::getIndexStatus, INDEXED)
             .set(Document::getIndexError, null)
             .set(Document::getRetryCount, 0));
     }
 
     @Override
-    public void markFailed(ResourceType type, long resourceId, String reason) {
+    public void markFailed(ResourceType type, long resourceId, int contentVersion, String reason) {
         if (type == ResourceType.NOTE) {
             noteMapper.update(null, Wrappers.<Note>lambdaUpdate().eq(Note::getId, resourceId)
+                .eq(Note::getContentVersion, contentVersion)
                 .set(Note::getIndexStatus, FAILED)
                 .set(Note::getIndexError, reason)
                 .setSql("retry_count = retry_count + 1"));
             return;
         }
         documentMapper.update(null, Wrappers.<Document>lambdaUpdate().eq(Document::getId, resourceId)
+            .eq(Document::getContentVersion, contentVersion)
             .set(Document::getIndexStatus, FAILED)
             .set(Document::getIndexError, reason)
             .setSql("retry_count = retry_count + 1"));
