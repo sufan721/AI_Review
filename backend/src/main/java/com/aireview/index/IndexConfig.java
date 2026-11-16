@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
@@ -41,6 +42,7 @@ public class IndexConfig {
     }
 
     @Bean
+    @Lazy
     public VectorStore vectorStore(
         @Value("${ai-review.index.milvus.host:localhost}") String host,
         @Value("${ai-review.index.milvus.port:19530}") int port,
