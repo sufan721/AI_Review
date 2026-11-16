@@ -62,7 +62,11 @@ public class JwtInterceptor implements HandlerInterceptor {
         }
         UserContext.set(userId);
 
-        if (handler instanceof HandlerMethod handlerMethod && !authorized(userId, handlerMethod)) {
+        if (!(handler instanceof HandlerMethod handlerMethod)) {
+            writeForbidden(response);
+            return false;
+        }
+        if (!authorized(userId, handlerMethod)) {
             writeForbidden(response);
             return false;
         }
