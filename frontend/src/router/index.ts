@@ -5,6 +5,9 @@ import NoteEditView from '../views/NoteEditView.vue'
 import NoteListView from '../views/NoteListView.vue'
 import DocumentListView from '../views/DocumentListView.vue'
 import RegisterView from '../views/RegisterView.vue'
+import KnowledgeBaseListView from '../views/KnowledgeBaseListView.vue'
+import KnowledgeBaseEditView from '../views/KnowledgeBaseEditView.vue'
+import KnowledgeBaseDetailView from '../views/KnowledgeBaseDetailView.vue'
 import ForgotPasswordView from '../views/ForgotPasswordView.vue'
 import SsoCallbackView from '../views/SsoCallbackView.vue'
 import { useAuthStore } from '../stores/auth'
@@ -22,6 +25,10 @@ const router = createRouter({
         { path: 'notes/new', name: 'note-new', component: NoteEditView },
         { path: 'notes/:id', name: 'note-edit', component: NoteEditView, props: true },
         { path: 'documents', name: 'documents', component: DocumentListView },
+        { path: 'knowledge-bases', name: 'knowledge-bases', component: KnowledgeBaseListView },
+        { path: 'knowledge-bases/new', name: 'knowledge-base-new', component: KnowledgeBaseEditView },
+        { path: 'knowledge-bases/:id', name: 'knowledge-base-detail', component: KnowledgeBaseDetailView, props: true },
+        { path: 'knowledge-bases/:id/edit', name: 'knowledge-base-edit', component: KnowledgeBaseEditView, props: true },
       ],
     },
     { path: '/login', name: 'login', component: LoginView },
