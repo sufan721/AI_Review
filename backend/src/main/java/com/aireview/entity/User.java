@@ -19,6 +19,21 @@ public class User {
 
     private String nickname;
 
+    private String phone;
+
+    private String email;
+
+    private String realName;
+
+    /** 1 正常，0 禁用。 */
+    private Integer status;
+
+    /** 连续登录失败次数，登录成功后清零。 */
+    private Integer failCount;
+
+    /** 锁定截止时间，NULL 表示未锁定。 */
+    private LocalDateTime lockUntil;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;

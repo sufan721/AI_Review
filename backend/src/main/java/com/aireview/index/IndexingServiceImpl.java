@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 /**
@@ -30,7 +31,7 @@ public class IndexingServiceImpl implements IndexingService {
     private final IndexTaskSink taskSink;
 
     public IndexingServiceImpl(IndexResourceRepository repository, DocumentChunkMapper chunkMapper,
-        MarkdownChunker chunker, EmbeddingClient embeddingClient, VectorStore vectorStore,
+        MarkdownChunker chunker, EmbeddingClient embeddingClient, @Lazy VectorStore vectorStore,
         IndexTaskSink taskSink) {
         this.repository = repository;
         this.chunkMapper = chunkMapper;

@@ -9,6 +9,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 public class PasswordEncoderConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        // cost=12 比默认 10 更抗离线破解；盐值内嵌于哈希，无需单独存盐
+        return new BCryptPasswordEncoder(12);
     }
 }

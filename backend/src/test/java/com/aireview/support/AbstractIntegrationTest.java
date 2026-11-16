@@ -63,6 +63,9 @@ public abstract class AbstractIntegrationTest {
 
     @DynamicPropertySource
     static void datasourceProperties(DynamicPropertyRegistry registry) {
+        // 测试用内存状态存储，不依赖 Redis；数据源仍走 Testcontainers 或外部测试库
+        registry.add("ai-review.auth.store", () -> "memory");
+        registry.add("ai-review.auth.captcha-enabled", () -> "true");
         if (MYSQL == null) {
             registry.add("spring.datasource.url", () -> EXTERNAL_DB_URL);
             registry.add("spring.datasource.username", () -> envOrDefault("TEST_DB_USERNAME", "root"));

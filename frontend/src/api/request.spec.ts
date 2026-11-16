@@ -45,6 +45,18 @@ describe('request', () => {
     await expect(request('/api/auth/register')).rejects.toThrow(new ApiError(409, '用户名已被占用'))
   })
 
+  it('turns an empty proxy response (backend down) into a readable error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 500 })))
+
+    await expect(request('/api/auth/captcha')).rejects.toThrow('服务暂不可用')
+  })
+
+  it('turns a non-JSON response into a readable error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>Bad Gateway</html>', { status: 502 })))
+
+    await expect(request('/api/auth/me')).rejects.toThrow('服务返回了无法解析的响应')
+  })
+
   it('drops the token and notifies the app when the token is rejected', async () => {
     const onUnauthorized = vi.fn()
     setUnauthorizedHandler(onUnauthorized)

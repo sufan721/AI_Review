@@ -17,10 +17,11 @@
 | --- | --- | --- |
 | 前端 | Vue 3 + TypeScript + Vite | 纯前端，通过 REST 调用后端 |
 | 前端状态/路由 | Pinia + Vue Router | 状态管理与路由 |
-| UI | Element Plus | 组件库 |
+| UI | 原生 CSS + CSS 变量 | 项目定位轻量极简，暂不引入组件库 |
 | 后端 | Java 17 + Spring Boot 3 | REST 接口服务 |
 | 数据访问 | MyBatis-Plus | ORM 数据访问 |
 | 数据库 | MySQL 8 | 生产数据库 |
+| 缓存/会话 | Redis 7 | 验证码、限流、刷新令牌与黑名单等带 TTL 的状态 |
 
 ## 架构
 
@@ -63,6 +64,8 @@ backend/                          # Java 后端 (Spring Boot)
     │   ├── entity/                    # 数据库实体
     │   ├── dto/                       # 出入参对象 (DTO/VO)
     │   ├── config/                    # 配置 (MyBatis、CORS、拦截器)
+    │   ├── security/                  # 鉴权 (JWT 会话、RBAC、验证码、状态存储)
+    │   ├── index/                     # 资料切片、嵌入与 Milvus 索引
     │   └── common/                    # 公共 (统一返回 Result、全局异常)
     └── resources/
         ├── application.yml            # 配置文件
@@ -71,7 +74,7 @@ frontend/                         # 前端 (Vue 3 + TS)
 ├── package.json
 ├── vite.config.ts
 └── src/
-    ├── api/                           # 接口封装 (axios)
+    ├── api/                           # 接口封装 (fetch + 统一 Result 解析)
     ├── views/                         # 页面
     ├── components/                    # 通用组件
     ├── stores/                        # Pinia 状态
@@ -83,57 +86,81 @@ docs/                             # 文档、SQL 脚本
 
 ## 快速开始
 
-### 后端
+前置要求：Docker Desktop、Node.js 20+。
 
-```bash
-cd backend
-./mvnw spring-boot:run
+### 一键启动（Windows）
+
+```powershell
+.\dev.ps1
 ```
 
-### 前端
+脚本会依次：生成 `deploy/.env`（首次）→ 用 Docker 拉起 MySQL / Redis / etcd / MinIO / Milvus → 建表 → 分别在新窗口启动后端与前端。
+启动后：后端 http://localhost:8080 ，前端 http://localhost:5173 ，SSO 模拟 IdP http://localhost:8080/api/auth/sso/mock 。
+
+### 手动启动
 
 ```bash
+# 1. 基础设施 + 建表（docs/sql/schema.sql 是唯一建表来源）
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example up -d mysql redis etcd minio milvus
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example cp docs/sql/schema.sql mysql:/tmp/schema.sql
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example exec -T mysql sh -c 'mysql -uroot -proot < /tmp/schema.sql'
+
+# 2. 后端（本机 MySQL 映射在宿主机 3307 端口）
+cd backend
+#   Windows PowerShell 用 .\mvnw.cmd spring-boot:run
+DB_URL='jdbc:mysql://localhost:3307/memo?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai' \
+  DB_USERNAME=memo DB_PASSWORD=memo REDIS_HOST=localhost MILVUS_HOST=localhost \
+  ./mvnw spring-boot:run
+
+# 3. 前端
 cd frontend
-pnpm install
-pnpm dev
+npm install
+npm run dev
+```
+
+### 全容器部署
+
+```bash
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example up -d --build
+# 首次仍需建表；前端容器端口见 deploy/.env 的 FRONTEND_PORT（默认 8088）
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example cp docs/sql/schema.sql mysql:/tmp/schema.sql
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example exec -T mysql sh -c 'mysql -uroot -proot < /tmp/schema.sql'
 ```
 
 ## 更多文档
 
 - [architecture.md](./architecture.md) — 项目架构设计说明
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — 贡献指南（分支/提交规范、代码红线、PR 流程）
+- [docs/需求分析.md](./docs/需求分析.md) — 需求模型、功能编号与验收口径
+- [docs/执行路线图-从当前状态到可演示MVP.md](./docs/执行路线图-从当前状态到可演示MVP.md) — 当前执行顺序
+- [docs/RBAC-禅道式权限设计讨论稿.md](./docs/RBAC-禅道式权限设计讨论稿.md) — RBAC 方案讨论
 
-## 基础框架运行
+## 当前进度
 
-```bash
-# 1. 启动本地 MySQL 与 Milvus（首次启动会自动建库）
-docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example up -d
+已交付：
 
-# 2. 建表（docs/sql/schema.sql 是唯一建表来源）
-docker exec -i $(docker compose -f deploy/docker-compose.yml ps -q mysql) \
-  mysql -uroot -proot < docs/sql/schema.sql
+- 基础框架：统一 API 响应与异常处理、健康检查、MySQL / Redis / Milvus（含 etcd、MinIO）本地编排与一键启动脚本。
+- 认证：图形验证码、密码登录（失败锁定 + 防枚举）、JWT 会话（jti + 刷新令牌轮换 + 登出黑名单）、
+  短信/邮件验证码登录（验证码打印到服务端终端）、找回密码、OIDC 统一身份认证（轻量对接 + 模拟 IdP）、
+  RBAC 角色（`ROLE_USER` / `ROLE_ADMIN`）、登录审计日志，以及对应的前端页面与登录态路由守卫。
+- 笔记：CRUD、置顶、归档、分页与 Markdown 双栏编辑器（渲染时关闭原生 HTML，避免 XSS）。
+- 文件：Markdown 上传（仅 `.md`、限 2MB）、列表、预览、删除与重索引。
+- 索引：切片 → 千问百炼嵌入 → Milvus 写入，含 `PENDING` / `INDEXED` / `FAILED` 状态与失败原因。
 
-# 3. 后端
-docker run --rm -v "${PWD}/backend:/workspace" -v aireview-maven-cache:/root/.m2 -w /workspace maven:3.9.9-eclipse-temurin-17 mvn spring-boot:run
-
-# 4. 前端
-npm --prefix frontend install
-npm --prefix frontend run dev
-```
-
-已交付：统一 API 响应与异常处理、健康检查、账户注册与登录（JWT + BCrypt）、登录态路由守卫、
-笔记 CRUD（置顶、归档、分页）与 Markdown 双栏编辑器（渲染时关闭原生 HTML，避免 XSS），
-以及 MySQL 与 Milvus 的本地依赖。标签与搜索、文件、知识库、索引和模型调用将作为后续独立功能交付。
+未完成（按执行路线图推进）：知识库与成员权限、知识库问答与引用、标签与搜索、分享与主题。
 
 ## 测试
 
 ```bash
-# 后端：JwtUtilTest 等纯单元测试不依赖外部服务；
-# 集成测试默认用 Testcontainers 起 MySQL 容器，
-# 若所在环境无法启动容器，可指向一个已建表的专用测试库：
+# 后端：集成测试默认用 Testcontainers 起 MySQL 8.4 容器（需要 Docker Desktop）。
+# Docker Engine 29+ 需固定客户端 API 版本，已通过 src/test/resources/docker-java.properties 处理。
+cd backend
+./mvnw test        # Windows PowerShell 用 .\mvnw.cmd test
+
+# 若环境无法启动容器，可指向一个已建表的专用测试库：
 TEST_DB_URL='jdbc:mysql://localhost:3307/memo?useUnicode=true&characterEncoding=UTF-8' \
   TEST_DB_USERNAME=memo TEST_DB_PASSWORD=memo \
-  mvn -f backend/pom.xml test
+  ./mvnw test
 
 # 前端
 npm --prefix frontend run test -- --run

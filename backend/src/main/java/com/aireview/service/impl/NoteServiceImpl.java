@@ -12,6 +12,7 @@ import com.aireview.entity.Note;
 import com.aireview.index.IndexingService;
 import com.aireview.index.ResourceType;
 import com.aireview.mapper.NoteMapper;
+import com.aireview.service.KnowledgeBaseService;
 import com.aireview.service.NoteService;
 import com.aireview.util.UserContext;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class NoteServiceImpl implements NoteService {
@@ -29,10 +31,13 @@ public class NoteServiceImpl implements NoteService {
 
     private final NoteMapper noteMapper;
     private final IndexingService indexingService;
+    private final KnowledgeBaseService knowledgeBaseService;
 
-    public NoteServiceImpl(NoteMapper noteMapper, IndexingService indexingService) {
+    public NoteServiceImpl(NoteMapper noteMapper, IndexingService indexingService,
+        KnowledgeBaseService knowledgeBaseService) {
         this.noteMapper = noteMapper;
         this.indexingService = indexingService;
+        this.knowledgeBaseService = knowledgeBaseService;
     }
 
     @Override
@@ -91,9 +96,11 @@ public class NoteServiceImpl implements NoteService {
     }
 
     @Override
+    @Transactional
     public void delete(Long id) {
         Note note = loadOwned(id);
         noteMapper.deleteById(note.getId());
+        knowledgeBaseService.deleteResourceAssociations(ResourceType.NOTE, id);
         indexingService.deleteResource(ResourceType.NOTE, id);
     }
 

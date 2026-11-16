@@ -7,10 +7,12 @@ describe('documentApi', () => {
   })
 
   it('uploads Markdown as multipart form data without a JSON content type', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ code: 0, message: 'OK', data: { id: 1 } }),
-    })
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ code: 0, message: 'OK', data: { id: 1 } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
     vi.stubGlobal('fetch', fetchMock)
 
     await documentApi.upload(new File(['# Guide'], 'guide.md', { type: 'text/markdown' }))

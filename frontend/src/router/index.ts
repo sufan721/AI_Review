@@ -5,6 +5,8 @@ import NoteEditView from '../views/NoteEditView.vue'
 import NoteListView from '../views/NoteListView.vue'
 import DocumentListView from '../views/DocumentListView.vue'
 import RegisterView from '../views/RegisterView.vue'
+import ForgotPasswordView from '../views/ForgotPasswordView.vue'
+import SsoCallbackView from '../views/SsoCallbackView.vue'
 import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
@@ -24,6 +26,8 @@ const router = createRouter({
     },
     { path: '/login', name: 'login', component: LoginView },
     { path: '/register', name: 'register', component: RegisterView },
+    { path: '/forgot', name: 'forgot', component: ForgotPasswordView },
+    { path: '/sso-callback', name: 'sso-callback', component: SsoCallbackView },
   ],
 })
 
