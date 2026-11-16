@@ -24,8 +24,15 @@
 
 | 功能 | 说明 | 优先级 |
 | --- | --- | --- |
-| 注册 / 登录 | 用户名 + 密码，登录后签发 JWT | P0 |
-| 身份鉴权 | 除公开分享外，所有接口需携带 Token | P0 |
+| 注册 | 用户名 + 密码（强度校验）、手机短信验证码、手机/邮箱唯一性 | P0 |
+| 密码登录 | 用户名 + 密码，失败锁定与防枚举，签发 JWT | P0 |
+| 短信/邮件验证码登录 | 验证码打印到服务端终端（无真实短信/邮件通道） | P0 |
+| 找回密码 | 通过手机/邮箱验证码重置密码 | P0 |
+| OIDC 统一身份认证 | 轻量对接：绑定表 + 自动开户 + 模拟 IdP | P0 |
+| 会话管理 | JWT（jti）+ 刷新令牌轮换 + 登出黑名单（存 Redis） | P0 |
+| RBAC | 角色/权限注解，`ROLE_ADMIN` 管理接口 | P0 |
+| 登录审计 | `sys_login_log` 记录每次登录结果 | P0 |
+| 身份鉴权 | 除公开接口外，所有接口需携带 Token | P0 |
 
 ### 1.2 笔记
 
@@ -76,12 +83,25 @@
 
 | 表名 | 说明 |
 | --- | --- |
-| `user` | 用户 |
+| `user` | 用户（含手机/邮箱、状态、失败计数与锁定时间） |
 | `note` | 笔记 |
 | `tag` | 标签 |
 | `note_tag` | 笔记-标签关联 |
 | `share` | 分享 |
 | `user_theme` | 用户自定义主题 |
+| `sys_role` | 角色 |
+| `sys_permission` | 权限 |
+| `sys_user_role` | 用户-角色关联 |
+| `sys_role_permission` | 角色-权限关联 |
+| `sys_user_sso_binding` | SSO 账号绑定 |
+| `sys_login_log` | 登录审计日志 |
+
+> 认证相关表（`user` 扩展字段与 `sys_*`、`sys_login_log`）的建表语句位于 `docs/sql/schema.sql`。
+>
+> **实现状态（2026-11）**：`user`、`sys_role`、`sys_permission`、`sys_user_role`、`sys_role_permission`、
+> `sys_user_sso_binding`、`sys_login_log`、`note`、`document`、`document_chunk` 已建表；
+> `tag`、`note_tag`、`share`、`user_theme` 仍为规划，尚未建表（见
+> [执行路线图](./docs/执行路线图-从当前状态到可演示MVP.md) 阶段 5）。
 
 ### 3.2 建表 SQL
 
@@ -193,6 +213,8 @@ CREATE TABLE `user_theme` (
   <dependency>io.jsonwebtoken:jjwt-impl</dependency>
   <dependency>io.jsonwebtoken:jjwt-jackson</dependency>
   <dependency>org.springframework.security:spring-security-crypto</dependency> <!-- BCrypt -->
+  <dependency>org.springframework.boot:spring-boot-starter-data-redis</dependency> <!-- 验证码/限流/刷新令牌/黑名单 -->
+  <dependency>org.springframework.boot:spring-boot-starter-mail</dependency> <!-- 邮件验证码(可选) -->
   <dependency>org.projectlombok:lombok</dependency>
 </dependencies>
 ```
@@ -202,14 +224,16 @@ CREATE TABLE `user_theme` (
 ```
 backend/src/main/java/com/aireview/
 ├── AiReviewApplication.java
-├── controller/          # AuthController, NoteController, TagController, ShareController, ThemeController
+├── controller/          # AuthController, SsoController(模拟 IdP), AdminController, NoteController, ...
 ├── service/
 │   ├── AuthService, NoteService, TagService, ShareService, ThemeService
+│   ├── TokenService, PermissionService, LoginLogService, SsoBindingService
 │   └── impl/
 ├── mapper/              # UserMapper, NoteMapper, TagMapper, NoteTagMapper, ShareMapper, UserThemeMapper
-├── entity/              # User, Note, Tag, NoteTag, Share, UserTheme
+├── entity/              # User, Note, Tag, NoteTag, Share, UserTheme, SsoBinding, LoginLog
 ├── dto/                 # 出入参对象 (见 4.4)
-├── config/              # WebConfig(CORS), MybatisPlusConfig, JwtInterceptor, SecurityConfig(密码加密)
+├── config/              # WebConfig(CORS), MybatisPlusConfig, JwtInterceptor, PasswordEncoderConfig
+├── security/            # TokenService, PermissionService, @RequireRole/@RequirePermission, AuthStateStore(Redis/内存), CaptchaService
 ├── common/
 │   ├── Result.java      # 统一返回
 │   ├── ResultCode.java  # 状态码枚举
@@ -268,9 +292,21 @@ public class PageResult<T> {
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| POST | `/api/auth/register` | 注册 |
-| POST | `/api/auth/login` | 登录，返回 JWT |
+| GET | `/api/auth/captcha` | 获取图形验证码 |
+| POST | `/api/auth/register` | 注册（手机号 + 短信验证码） |
+| POST | `/api/auth/login` | 密码登录，返回 JWT + 刷新令牌 |
+| POST | `/api/auth/refresh` | 刷新令牌轮换 |
+| POST | `/api/auth/logout` | 登出（拉黑当前令牌） |
+| POST | `/api/auth/sms/send` | 发送短信验证码 |
+| POST | `/api/auth/sms/login` | 短信验证码登录 |
+| POST | `/api/auth/email/send` | 发送邮件验证码 |
+| POST | `/api/auth/email/login` | 邮件验证码登录 |
+| POST | `/api/auth/forgot/send-code` | 发送重置验证码 |
+| POST | `/api/auth/forgot/reset` | 重置密码 |
+| POST | `/api/auth/sso/login` | SSO 登录（绑定/自动开户） |
 | GET | `/api/auth/me` | 获取当前用户信息 |
+
+`AdminController`（`@RequireRole("ROLE_ADMIN")`）提供管理接口，如 `GET /api/admin/users`。
 
 #### 笔记 `NoteController`
 
@@ -284,7 +320,7 @@ public class PageResult<T> {
 | PATCH | `/api/notes/{id}/pin` | 置顶/取消置顶 |
 | PATCH | `/api/notes/{id}/archive` | 归档/取消归档 |
 
-#### 标签 `TagController`
+#### 标签 `TagController`（规划，未实现）
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -293,7 +329,7 @@ public class PageResult<T> {
 | PUT | `/api/tags/{id}` | 重命名 |
 | DELETE | `/api/tags/{id}` | 删除（级联删 note_tag） |
 
-#### 分享 `ShareController`
+#### 分享 `ShareController`（规划，未实现）
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -303,7 +339,7 @@ public class PageResult<T> {
 | GET | `/api/share/{token}` | **公开**：按 token 读取笔记（含只读/可编辑判定） |
 | PUT | `/api/share/{token}` | **公开**：可编辑分享下更新笔记 |
 
-#### 主题 `ThemeController`
+#### 主题 `ThemeController`（规划，未实现）
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -314,12 +350,15 @@ public class PageResult<T> {
 
 ### 4.6 鉴权实现
 
-1. `JwtUtil`：`generateToken(userId)` / `parseToken(token)`，密钥放 `application.yml`，过期时间默认 7 天。
-2. `JwtInterceptor` 实现 `HandlerInterceptor`：
-   - 从请求头取 `Authorization`，解析出 `userId` 存入 `UserContext`（`ThreadLocal`）。
-   - 未登录 / 过期 → 返回 `401`。
-3. `WebConfig` 注册拦截器，放行白名单：`/api/auth/**`、`/api/share/**`（公开分享）、静态资源。
-4. **越权校验**：Service 层所有按 `id` 操作均以 `user_id = 当前用户` 为条件查询，杜绝水平越权。
+1. `JwtUtil`：HS256 签发，每个访问令牌带唯一 `jti`；`TokenService` 负责签发、刷新轮换与登出黑名单。
+2. `JwtInterceptor`（`HandlerInterceptor`）：
+   - 从请求头取 `Authorization`，校验签名与有效期，检查 `jti` 是否在黑名单。
+   - 将 `userId` 存入 `UserContext`（`ThreadLocal`）。
+   - 识别 `@RequireRole` / `@RequirePermission` 注解做 RBAC 校验（`ROLE_ADMIN` 拥有全部权限）。
+   - 未登录 / 过期 → `401`；无权限 → `403`。
+3. 带 TTL 的状态（图形/短信/邮件验证码、限流、刷新令牌、黑名单）统一经 `AuthStateStore` 存取：生产用 Redis，测试用内存实现。
+4. `WebConfig` 注册拦截器，放行白名单：`/api/auth/**`、公开接口、静态资源。
+5. **越权校验**：Service 层所有按 `id` 操作均以 `user_id = 当前用户` 为条件查询，杜绝水平越权。
 
 ### 4.7 配置文件 `application.yml`
 
@@ -446,15 +485,21 @@ jwt:
 
 ## 7. 分阶段实施计划
 
-| 阶段 | 内容 | 产出 | 验收标准 |
-| --- | --- | --- | --- |
-| **P0 脚手架** | 后端 Spring Boot 骨架、前端 Vite 骨架、连通性验证 | 两个可运行的空工程 | 后端 `/api/health` 返回 200；前端可访问 |
-| **P0 认证** | 建库表 `user`，注册/登录/鉴权拦截器 | 登录页 + JWT | 注册登录可用，未登录访问受保护接口返回 401 |
-| **P0 笔记 CRUD** | `note` 表 + 笔记接口 + 列表/编辑器页 | 笔记增删改查 + Markdown 渲染 | 可新建、编辑、删除笔记并实时预览 |
-| **P1 标签/搜索** | `tag`/`note_tag` 表 + 标签接口 + 搜索过滤 | 标签栏 + 搜索框 | 可按标签过滤、关键词搜索 |
-| **P1 分享** | `share` 表 + 分享接口 + 分享页 | 分享链接生成与访问 | 生成的链接可匿名访问笔记 |
-| **P2 主题** | `user_theme` 表 + 主题接口 + 主题设置页 | 主题切换 | 可切换/自定义主题并持久化 |
-| **P2 部署** | Dockerfile + docker-compose + nginx | 一键部署 | 一条命令拉起全栈 |
+> **执行口径以 [执行路线图](./docs/执行路线图-从当前状态到可演示MVP.md) 为准**：先稳定基线，再做知识库成员级 RBAC，
+> 然后稳定索引、打通最小问答闭环；标签、分享、主题等排在其后。
+
+| 阶段 | 内容 | 产出 | 验收标准 | 状态 |
+| --- | --- | --- | --- | --- |
+| **P0 脚手架** | 后端 Spring Boot 骨架、前端 Vite 骨架、连通性验证 | 两个可运行的空工程 | 后端 `/api/health` 返回 200；前端可访问 | 已完成 |
+| **P0 认证** | 建库表 `user`，注册/登录/鉴权拦截器 | 登录页 + JWT | 注册登录可用，未登录访问受保护接口返回 401 | 已完成（含验证码、多登录方式、SSO、RBAC、审计） |
+| **P0 笔记 CRUD** | `note` 表 + 笔记接口 + 列表/编辑器页 | 笔记增删改查 + Markdown 渲染 | 可新建、编辑、删除笔记并实时预览 | 已完成 |
+| **P0 文件与索引** | `document`/`document_chunk` + 切片 + 嵌入 + Milvus | 上传、切片、索引状态 | 上传后状态可由 PENDING 变为 INDEXED，失败可重试 | 已完成 |
+| **P1 知识库与成员 RBAC** | `knowledge_base` + 成员关系 | OWNER / EDITOR / VIEWER | 非成员访问返回 403，VIEWER 不能改资料 | 规划中（路线图阶段 2） |
+| **P1 知识库问答** | 检索 + 引用 | 问答接口与页面 | 提问返回回答与引用片段 | 规划中（路线图阶段 4） |
+| **P1 标签/搜索** | `tag`/`note_tag` 表 + 接口 + 搜索过滤 | 标签栏 + 搜索框 | 可按标签过滤、关键词搜索 | 规划中 |
+| **P2 分享** | `share` 表 + 分享接口 + 分享页 | 分享链接生成与访问 | 生成的链接可匿名访问笔记 | 规划中 |
+| **P2 主题** | `user_theme` 表 + 主题接口 + 主题设置页 | 主题切换 | 可切换/自定义主题并持久化 | 规划中 |
+| **P2 部署** | Dockerfile + docker-compose + nginx | 一键部署 | 一条命令拉起全栈 | 已完成 |
 
 ---
 
