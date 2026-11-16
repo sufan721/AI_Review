@@ -10,10 +10,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.aireview.security.AuthStateStore;
 import com.aireview.support.AbstractIntegrationTest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +31,13 @@ class NoteControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private AuthStateStore store;
+
+    private static final String PASSWORD = "Secret123!";
+    private static final String SMS_CODE = "123456";
+    private int phoneSeq = 0;
 
     private String aliceToken;
 
@@ -263,15 +272,20 @@ class NoteControllerTest extends AbstractIntegrationTest {
     }
 
     private String register(String username) throws Exception {
+        String phone = String.format("138%08d", ++phoneSeq);
+        store.put("sms:code:" + phone, SMS_CODE, Duration.ofMinutes(5));
         ObjectNode credentials = objectMapper.createObjectNode()
             .put("username", username)
-            .put("password", "secret123");
+            .put("password", PASSWORD)
+            .put("confirmPassword", PASSWORD)
+            .put("phone", phone)
+            .put("smsCode", SMS_CODE);
         String body = mockMvc.perform(post("/api/auth/register")
                 .contentType(APPLICATION_JSON)
                 .content(credentials.toString()))
             .andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString();
-        return objectMapper.readTree(body).path("data").path("token").asText();
+        return objectMapper.readTree(body).path("data").path("accessToken").asText();
     }
 
     private String noteBody(String title, String content) {

@@ -8,6 +8,15 @@ spring:
     password: ${DB_PASSWORD:memo}
   jackson:
     time-zone: GMT+8
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
@@ -17,12 +26,22 @@ mybatis-plus:
 jwt:
   # 本地开发占位密钥，生产必须通过环境变量注入至少 32 字节的随机串
   secret: ${JWT_SECRET:dev-only-secret-change-me-please-32bytes}
-  expire-hours: ${JWT_EXPIRE_HOURS:168}
+  access-ttl-seconds: ${JWT_ACCESS_TTL_SECONDS:1800}
+  refresh-ttl-seconds: ${JWT_REFRESH_TTL_SECONDS:604800}
 
 server:
   port: ${SERVER_PORT:8080}
 
 ai-review:
+  auth:
+    # 状态存储：redis（生产） / memory（测试或单机轻量部署，不依赖 Redis）
+    store: ${AUTH_STORE:redis}
+    # 密码登录/注册是否校验图形验证码
+    captcha-enabled: ${AUTH_CAPTCHA_ENABLED:true}
+    # 邮件验证码是否走真实 SMTP；关闭时与短信一致降级为控制台打印
+    mail-enabled: ${AUTH_MAIL_ENABLED:false}
+    # SSO 模拟 IdP 登录页在前端回跳的地址（带协议），用于演示完整 OIDC 回调
+    frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
   index:
     chunk:
       max-size: ${INDEX_CHUNK_MAX_SIZE:800}

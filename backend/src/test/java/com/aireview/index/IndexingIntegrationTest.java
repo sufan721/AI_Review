@@ -7,11 +7,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.aireview.security.AuthStateStore;
 import com.aireview.support.AbstractIntegrationTest;
 import com.aireview.support.ControlledTaskExecutor;
 import com.aireview.support.FakeEmbeddingClient;
 import com.aireview.support.InMemoryVectorStore;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +28,11 @@ class IndexingIntegrationTest extends AbstractIntegrationTest {
     @Autowired private ControlledTaskExecutor taskExecutor;
     @Autowired private InMemoryVectorStore vectorStore;
     @Autowired private FakeEmbeddingClient embeddingClient;
+    @Autowired private AuthStateStore store;
+
+    private static final String PASSWORD = "Secret123!";
+    private static final String SMS_CODE = "123456";
+    private int phoneSeq = 0;
 
     private String aliceToken;
     private String bobToken;
@@ -147,12 +154,21 @@ class IndexingIntegrationTest extends AbstractIntegrationTest {
     }
 
     private String register(String username) throws Exception {
+        String phone = String.format("138%08d", ++phoneSeq);
+        store.put("sms:code:" + phone, SMS_CODE, Duration.ofMinutes(5));
+        String credentials = objectMapper.createObjectNode()
+            .put("username", username)
+            .put("password", PASSWORD)
+            .put("confirmPassword", PASSWORD)
+            .put("phone", phone)
+            .put("smsCode", SMS_CODE)
+            .toString();
         String body = mockMvc.perform(post("/api/auth/register")
                 .contentType(APPLICATION_JSON)
-                .content(objectMapper.createObjectNode().put("username", username).put("password", "secret123").toString()))
+                .content(credentials))
             .andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString();
-        return objectMapper.readTree(body).path("data").path("token").asText();
+        return objectMapper.readTree(body).path("data").path("accessToken").asText();
     }
 
     private String bearer(String token) {

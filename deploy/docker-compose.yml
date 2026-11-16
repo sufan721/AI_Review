@@ -33,6 +33,10 @@ services:
     ports: ["19530:19530", "9091:9091"]
     depends_on: [etcd, minio]
     volumes: ["milvus-data:/var/lib/milvus"]
+  redis:
+    image: redis:7.4
+    ports: ["${REDIS_PORT:-6379}:6379"]
+    volumes: ["redis-data:/data"]
   backend:
     build:
       context: ../backend
@@ -40,6 +44,8 @@ services:
       DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}
       DB_USERNAME: ${MYSQL_USER}
       DB_PASSWORD: ${MYSQL_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       MILVUS_HOST: ${MILVUS_HOST:-milvus}
       MILVUS_PORT: ${MILVUS_PORT:-19530}
       MILVUS_COLLECTION: ${MILVUS_COLLECTION:-memo_chunks}
@@ -50,6 +56,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_started
       milvus:
         condition: service_started
   frontend:
@@ -59,6 +67,7 @@ services:
     depends_on: [backend]
 volumes:
   mysql-data:
+  redis-data:
   etcd-data:
   minio-data:
   milvus-data:

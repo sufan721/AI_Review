@@ -1,7 +1,5 @@
 package com.aireview.config;
 
-import com.aireview.util.JwtUtil;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -12,20 +10,28 @@ public class WebConfig implements WebMvcConfigurer {
     static final String[] PUBLIC_PATHS = {
         "/api/health",
         "/api/auth/register",
-        "/api/auth/login"
+        "/api/auth/login",
+        "/api/auth/captcha",
+        "/api/auth/refresh",
+        "/api/auth/sms/send",
+        "/api/auth/sms/login",
+        "/api/auth/email/send",
+        "/api/auth/email/login",
+        "/api/auth/forgot/send-code",
+        "/api/auth/forgot/reset",
+        "/api/auth/sso/login",
+        "/api/auth/sso/mock"
     };
 
-    private final JwtUtil jwtUtil;
-    private final ObjectMapper objectMapper;
+    private final JwtInterceptor jwtInterceptor;
 
-    public WebConfig(JwtUtil jwtUtil, ObjectMapper objectMapper) {
-        this.jwtUtil = jwtUtil;
-        this.objectMapper = objectMapper;
+    public WebConfig(JwtInterceptor jwtInterceptor) {
+        this.jwtInterceptor = jwtInterceptor;
     }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new JwtInterceptor(jwtUtil, objectMapper))
+        registry.addInterceptor(jwtInterceptor)
             .addPathPatterns("/api/**")
             .excludePathPatterns(PUBLIC_PATHS);
     }
