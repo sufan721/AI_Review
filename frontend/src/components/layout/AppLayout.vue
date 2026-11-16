@@ -18,6 +18,7 @@ async function logout() {
       <nav class="nav">
         <RouterLink to="/notes">笔记</RouterLink>
         <RouterLink to="/documents">文件</RouterLink>
+        <RouterLink to="/knowledge-bases">知识库</RouterLink>
       </nav>
       <RouterLink class="btn btn-primary create-note" :to="{ name: 'note-new' }">新建笔记</RouterLink>
       <div class="account">
