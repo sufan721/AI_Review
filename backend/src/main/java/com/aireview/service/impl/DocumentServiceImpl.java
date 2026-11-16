@@ -10,6 +10,7 @@ import com.aireview.index.IndexingService;
 import com.aireview.index.ResourceType;
 import com.aireview.mapper.DocumentMapper;
 import com.aireview.service.DocumentService;
+import com.aireview.service.KnowledgeBaseService;
 import com.aireview.util.UserContext;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -17,6 +18,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -26,10 +28,13 @@ public class DocumentServiceImpl implements DocumentService {
 
     private final DocumentMapper documentMapper;
     private final IndexingService indexingService;
+    private final KnowledgeBaseService knowledgeBaseService;
 
-    public DocumentServiceImpl(DocumentMapper documentMapper, IndexingService indexingService) {
+    public DocumentServiceImpl(DocumentMapper documentMapper, IndexingService indexingService,
+        KnowledgeBaseService knowledgeBaseService) {
         this.documentMapper = documentMapper;
         this.indexingService = indexingService;
+        this.knowledgeBaseService = knowledgeBaseService;
     }
 
     @Override
@@ -67,8 +72,10 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
+    @Transactional
     public void delete(Long id) {
         documentMapper.deleteById(loadOwned(id).getId());
+        knowledgeBaseService.deleteResourceAssociations(ResourceType.DOCUMENT, id);
         indexingService.deleteResource(ResourceType.DOCUMENT, id);
     }
 

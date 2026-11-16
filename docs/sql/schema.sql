@@ -153,3 +153,39 @@ CREATE TABLE IF NOT EXISTS `document_chunk` (
   UNIQUE KEY `uk_resource_version_chunk` (`resource_type`, `resource_id`, `content_version`, `chunk_index`),
   KEY `idx_resource` (`resource_type`, `resource_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资料切片';
+
+-- 知识库
+CREATE TABLE IF NOT EXISTS `knowledge_base` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT,
+  `owner_id`    BIGINT       NOT NULL COMMENT '拥有者用户 ID',
+  `name`        VARCHAR(128) NOT NULL COMMENT '知识库名称',
+  `description` VARCHAR(512) DEFAULT NULL COMMENT '描述',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_owner` (`owner_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='知识库';
+
+-- 知识库成员
+CREATE TABLE IF NOT EXISTS `knowledge_base_member` (
+  `id`                BIGINT      NOT NULL AUTO_INCREMENT,
+  `knowledge_base_id` BIGINT      NOT NULL COMMENT '知识库 ID',
+  `user_id`           BIGINT      NOT NULL COMMENT '成员用户 ID',
+  `member_role`       VARCHAR(16) NOT NULL COMMENT 'OWNER/EDITOR/VIEWER',
+  `created_at`        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_kb_user` (`knowledge_base_id`, `user_id`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='知识库成员';
+
+-- 知识库资料关联
+CREATE TABLE IF NOT EXISTS `knowledge_base_resource` (
+  `id`                BIGINT      NOT NULL AUTO_INCREMENT,
+  `knowledge_base_id` BIGINT      NOT NULL COMMENT '知识库 ID',
+  `resource_type`     VARCHAR(16) NOT NULL COMMENT 'NOTE/DOCUMENT',
+  `resource_id`       BIGINT      NOT NULL COMMENT '资料 ID（note.id 或 document.id）',
+  `created_at`        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_kb_resource` (`knowledge_base_id`, `resource_type`, `resource_id`),
+  KEY `idx_resource` (`resource_type`, `resource_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='知识库资料关联';

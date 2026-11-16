@@ -95,11 +95,15 @@
 | `sys_role_permission` | 角色-权限关联 |
 | `sys_user_sso_binding` | SSO 账号绑定 |
 | `sys_login_log` | 登录审计日志 |
+| `knowledge_base` | 知识库 |
+| `knowledge_base_member` | 知识库成员（OWNER/EDITOR/VIEWER） |
+| `knowledge_base_resource` | 知识库资料关联 |
 
 > 认证相关表（`user` 扩展字段与 `sys_*`、`sys_login_log`）的建表语句位于 `docs/sql/schema.sql`。
 >
 > **实现状态（2026-11）**：`user`、`sys_role`、`sys_permission`、`sys_user_role`、`sys_role_permission`、
-> `sys_user_sso_binding`、`sys_login_log`、`note`、`document`、`document_chunk` 已建表；
+> `sys_user_sso_binding`、`sys_login_log`、`note`、`document`、`document_chunk`、`knowledge_base`、
+> `knowledge_base_member`、`knowledge_base_resource` 已建表；
 > `tag`、`note_tag`、`share`、`user_theme` 仍为规划，尚未建表（见
 > [执行路线图](./docs/执行路线图-从当前状态到可演示MVP.md) 阶段 5）。
 
@@ -180,6 +184,42 @@ CREATE TABLE `user_theme` (
   PRIMARY KEY (`id`),
   KEY `idx_user` (`user_id`)
 ) ENGINE=InnoDB COMMENT='自定义主题';
+
+-- 知识库
+CREATE TABLE `knowledge_base` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT,
+  `owner_id`    BIGINT       NOT NULL COMMENT '拥有者用户 ID',
+  `name`        VARCHAR(128) NOT NULL COMMENT '知识库名称',
+  `description` VARCHAR(512) DEFAULT NULL COMMENT '描述',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_owner` (`owner_id`)
+) ENGINE=InnoDB COMMENT='知识库';
+
+-- 知识库成员
+CREATE TABLE `knowledge_base_member` (
+  `id`                BIGINT      NOT NULL AUTO_INCREMENT,
+  `knowledge_base_id` BIGINT      NOT NULL,
+  `user_id`           BIGINT      NOT NULL,
+  `member_role`       VARCHAR(16) NOT NULL COMMENT 'OWNER/EDITOR/VIEWER',
+  `created_at`        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_kb_user` (`knowledge_base_id`, `user_id`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB COMMENT='知识库成员';
+
+-- 知识库资料关联
+CREATE TABLE `knowledge_base_resource` (
+  `id`                BIGINT      NOT NULL AUTO_INCREMENT,
+  `knowledge_base_id` BIGINT      NOT NULL,
+  `resource_type`     VARCHAR(16) NOT NULL COMMENT 'NOTE/DOCUMENT',
+  `resource_id`       BIGINT      NOT NULL,
+  `created_at`        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_kb_resource` (`knowledge_base_id`, `resource_type`, `resource_id`),
+  KEY `idx_resource` (`resource_type`, `resource_id`)
+) ENGINE=InnoDB COMMENT='知识库资料关联';
 ```
 
 > 建表脚本统一放入 `docs/sql/schema.sql`，随仓库交付。
@@ -190,6 +230,9 @@ CREATE TABLE `user_theme` (
 - `note.content_version` / `note.index_status`：正文每次有效变更时 `content_version` 递增并把 `index_status` 置回 `PENDING`，索引侧据此判断已有切片是否过期（见 6.4）。
 - `note_tag`：笔记与标签的**多对多**关联。
 - `share.note_id → note.id`：一篇笔记可生成多个分享链接。
+- `knowledge_base.owner_id → user.id`：知识库拥有者。
+- `knowledge_base_member`：知识库与用户的**多对多**成员关系，成员角色 OWNER/EDITOR/VIEWER。
+- `knowledge_base_resource`：知识库与 note/document 的**多对多**资料关联（第一版仅允许加入本人资料）。
 
 ---
 
@@ -281,6 +324,14 @@ public class PageResult<T> {
 | `ShareCreateRequest` | mode, expiresAt | 创建分享 |
 | `ShareVO` | id, token, mode, expiresAt, url | 分享返回 |
 | `ThemeRequest` | name, config, isDefault | 主题增改 |
+| `KnowledgeBaseCreateRequest` | name, description | 新建知识库 |
+| `KnowledgeBaseUpdateRequest` | name, description | 更新知识库 |
+| `KnowledgeBaseVO` | id, ownerId, name, description, memberRole, createdAt, updatedAt | 知识库返回（memberRole 为当前用户角色） |
+| `MemberAddRequest` | userId, memberRole | 添加成员 |
+| `MemberRoleUpdateRequest` | memberRole | 修改成员角色 |
+| `KnowledgeBaseMemberVO` | userId, username, nickname, memberRole, createdAt | 成员返回 |
+| `ResourceAddRequest` | resourceType, resourceId | 关联资料 |
+| `KnowledgeBaseResourceVO` | resourceId, resourceType, name, indexStatus, addedAt | 资料返回 |
 
 > 原则：**Controller 不直接暴露 `entity`**，出入参一律用 DTO/VO 隔离数据库结构。
 
@@ -319,6 +370,23 @@ public class PageResult<T> {
 | DELETE | `/api/notes/{id}` | 删除（级联删 note_tag / share） |
 | PATCH | `/api/notes/{id}/pin` | 置顶/取消置顶 |
 | PATCH | `/api/notes/{id}/archive` | 归档/取消归档 |
+
+#### 知识库 `KnowledgeBaseController`
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/knowledge-bases` | 新建（创建者自动成为 OWNER） |
+| GET | `/api/knowledge-bases` | 我参与的知识库列表 |
+| GET | `/api/knowledge-bases/{id}` | 详情（成员可见） |
+| PUT | `/api/knowledge-bases/{id}` | 更新（仅 OWNER） |
+| DELETE | `/api/knowledge-bases/{id}` | 删除（仅 OWNER，仅删成员/资料关联，不删笔记/文件） |
+| GET | `/api/knowledge-bases/{id}/members` | 成员列表 |
+| POST | `/api/knowledge-bases/{id}/members` | 添加成员（仅 OWNER） |
+| PUT | `/api/knowledge-bases/{id}/members/{userId}` | 修改成员角色（仅 OWNER） |
+| DELETE | `/api/knowledge-bases/{id}/members/{userId}` | 移除成员（仅 OWNER） |
+| GET | `/api/knowledge-bases/{id}/resources` | 资料列表 |
+| POST | `/api/knowledge-bases/{id}/resources` | 关联资料（OWNER/EDITOR，仅本人资料） |
+| DELETE | `/api/knowledge-bases/{id}/resources/{resourceType}/{resourceId}` | 移除资料（OWNER/EDITOR） |
 
 #### 标签 `TagController`（规划，未实现）
 
@@ -359,6 +427,7 @@ public class PageResult<T> {
 3. 带 TTL 的状态（图形/短信/邮件验证码、限流、刷新令牌、黑名单）统一经 `AuthStateStore` 存取：生产用 Redis，测试用内存实现。
 4. `WebConfig` 注册拦截器，放行白名单：`/api/auth/**`、公开接口、静态资源。
 5. **越权校验**：Service 层所有按 `id` 操作均以 `user_id = 当前用户` 为条件查询，杜绝水平越权。
+6. **知识库成员级鉴权**：知识库接口只依据 `knowledge_base_member` 判定，**不参考全局角色**——即使 `ROLE_ADMIN` 也必须显式成为成员后才能操作库内资料；非成员与不存在的知识库统一返回 403。删除笔记/文件时由 Service 层清理 `knowledge_base_resource` 关联，但不影响资料本身。
 
 ### 4.7 配置文件 `application.yml`
 
@@ -494,7 +563,7 @@ jwt:
 | **P0 认证** | 建库表 `user`，注册/登录/鉴权拦截器 | 登录页 + JWT | 注册登录可用，未登录访问受保护接口返回 401 | 已完成（含验证码、多登录方式、SSO、RBAC、审计） |
 | **P0 笔记 CRUD** | `note` 表 + 笔记接口 + 列表/编辑器页 | 笔记增删改查 + Markdown 渲染 | 可新建、编辑、删除笔记并实时预览 | 已完成 |
 | **P0 文件与索引** | `document`/`document_chunk` + 切片 + 嵌入 + Milvus | 上传、切片、索引状态 | 上传后状态可由 PENDING 变为 INDEXED，失败可重试 | 已完成 |
-| **P1 知识库与成员 RBAC** | `knowledge_base` + 成员关系 | OWNER / EDITOR / VIEWER | 非成员访问返回 403，VIEWER 不能改资料 | 规划中（路线图阶段 2） |
+| **P1 知识库与成员 RBAC** | `knowledge_base` + 成员关系 | OWNER / EDITOR / VIEWER | 非成员访问返回 403，VIEWER 不能改资料 | 后端/DB/测试已完成（阶段 2A），前端待做 |
 | **P1 知识库问答** | 检索 + 引用 | 问答接口与页面 | 提问返回回答与引用片段 | 规划中（路线图阶段 4） |
 | **P1 标签/搜索** | `tag`/`note_tag` 表 + 接口 + 搜索过滤 | 标签栏 + 搜索框 | 可按标签过滤、关键词搜索 | 规划中 |
 | **P2 分享** | `share` 表 + 分享接口 + 分享页 | 分享链接生成与访问 | 生成的链接可匿名访问笔记 | 规划中 |
