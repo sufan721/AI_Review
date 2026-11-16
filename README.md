@@ -86,28 +86,51 @@ docs/                             # 文档、SQL 脚本
 
 ## 快速开始
 
-前置要求：Docker Desktop、Node.js 20+。
+前置要求：Docker Desktop（Docker Compose v2）。使用 `dev.ps1` 在宿主机运行前后端时，还需要 JDK 17、Node.js 20+；全容器模式不需要在宿主机安装 JDK 或 Node.js。
 
-### 一键启动（Windows）
+### 一键启动（Windows，本地开发）
 
 ```powershell
 .\dev.ps1
 ```
 
-脚本会依次：生成 `deploy/.env`（首次）→ 用 Docker 拉起 MySQL / Redis / etcd / MinIO / Milvus → 建表 → 分别在新窗口启动后端与前端。
+该脚本首次运行时生成 `deploy/.env`，然后用 Docker 启动 MySQL / Redis / etcd / MinIO / Milvus、导入数据库表结构，并在宿主机新窗口运行后端和前端。后端通过宿主机映射端口连接依赖（MySQL `localhost:3307`、Redis `localhost:6379`、Milvus `localhost:19530`）。
 启动后：后端 http://localhost:8080 ，前端 http://localhost:5173 ，SSO 模拟 IdP http://localhost:8080/api/auth/sso/mock 。
 
-### 手动启动
+### 一键启动（Windows，全部运行在 Docker）
+
+```powershell
+.\start-docker.ps1
+```
+
+首次运行会从 `deploy/.env.example` 生成 `deploy/.env`（已存在时不会覆盖），启动 MySQL / Redis / etcd / MinIO / Milvus 并等待 MySQL、Redis 健康检查通过（etcd、MinIO、Milvus 仅等待容器启动），导入 `docs/sql/schema.sql` 后，再构建并启动后端与前端容器。容器中的后端使用 Compose 服务名连接 MySQL `mysql:3306`、Redis `redis:6379` 和 Milvus `milvus:19530`；不要将其改为宿主机映射地址。默认后端地址为 http://localhost:8080 ，前端地址为 http://localhost:8088 。可编辑 `deploy/.env` 自定义端口及服务配置；脚本会将默认前端地址传给后端作为 SSO 回跳地址。
+
+查看后端日志：
+
+```powershell
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env logs -f backend
+```
+
+停止容器但保留数据库等数据卷：
+
+```powershell
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env down
+```
+
+不要添加 `-v`，除非确实要删除持久化数据。
+
+### 手动启动（宿主机运行前后端）
 
 ```bash
-# 1. 基础设施 + 建表（docs/sql/schema.sql 是唯一建表来源）
-docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example up -d mysql redis etcd minio milvus
-docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example cp docs/sql/schema.sql mysql:/tmp/schema.sql
-docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example exec -T mysql sh -c 'mysql -uroot -proot < /tmp/schema.sql'
+# 1. 先准备 deploy/.env（首次可复制 deploy/.env.example），启动基础设施并导入表结构
+# docs/sql/schema.sql 是唯一建表来源
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --wait mysql redis etcd minio milvus
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env cp docs/sql/schema.sql mysql:/tmp/schema.sql
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" < /tmp/schema.sql'
 
 # 2. 后端（本机 MySQL 映射在宿主机 3307 端口）
 cd backend
-#   Windows PowerShell 用 .\mvnw.cmd spring-boot:run
+# Windows PowerShell: set these variables with $env:DB_URL, $env:DB_USERNAME, $env:DB_PASSWORD, $env:REDIS_HOST, and $env:MILVUS_HOST, then run .\mvnw.cmd spring-boot:run
 DB_URL='jdbc:mysql://localhost:3307/memo?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai' \
   DB_USERNAME=memo DB_PASSWORD=memo REDIS_HOST=localhost MILVUS_HOST=localhost \
   ./mvnw spring-boot:run
@@ -118,13 +141,15 @@ npm install
 npm run dev
 ```
 
-### 全容器部署
+### 手动全容器部署
+
+启动基础设施并导入 schema 后，再构建并启动应用容器（首次初始化不能在 schema 导入前启动后端）：
 
 ```bash
-docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example up -d --build
-# 首次仍需建表；前端容器端口见 deploy/.env 的 FRONTEND_PORT（默认 8088）
-docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example cp docs/sql/schema.sql mysql:/tmp/schema.sql
-docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example exec -T mysql sh -c 'mysql -uroot -proot < /tmp/schema.sql'
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --wait mysql redis etcd minio milvus
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env cp docs/sql/schema.sql mysql:/tmp/schema.sql
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" < /tmp/schema.sql'
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build backend frontend
 ```
 
 ## 更多文档

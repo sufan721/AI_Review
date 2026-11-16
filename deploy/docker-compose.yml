@@ -37,6 +37,11 @@ services:
     image: redis:7.4
     ports: ["${REDIS_PORT:-6379}:6379"]
     volumes: ["redis-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
   backend:
     build:
       context: ../backend
@@ -52,12 +57,13 @@ services:
       MILVUS_DIMENSION: ${MILVUS_DIMENSION:-1024}
       INDEX_EMBEDDING_API_KEY: ${INDEX_EMBEDDING_API_KEY:-}
       INDEX_EMBEDDING_BATCH_SIZE: ${INDEX_EMBEDDING_BATCH_SIZE:-10}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:8088}
     ports: ["${BACKEND_PORT:-8080}:8080"]
     depends_on:
       mysql:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       milvus:
         condition: service_started
   frontend:
