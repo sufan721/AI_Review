@@ -24,9 +24,9 @@ $envFile     = Join-Path $PSScriptRoot 'deploy/.env'
 $envExample  = Join-Path $PSScriptRoot 'deploy/.env.example'
 $schemaSql   = Join-Path $PSScriptRoot 'docs/sql/schema.sql'
 
-function Compose([string[]]$Args) {
-    docker compose -f $composeFile --env-file $envFile @Args
-    if ($LASTEXITCODE -ne 0) { throw "docker compose 执行失败: $($Args -join ' ')" }
+function Compose([string[]]$CommandArgs) {
+    docker compose -f $composeFile --env-file $envFile @CommandArgs
+    if ($LASTEXITCODE -ne 0) { throw "docker compose 执行失败: $($CommandArgs -join ' ')" }
 }
 
 Write-Host '==> 准备环境变量'
@@ -36,11 +36,11 @@ if (-not (Test-Path $envFile)) {
 }
 
 Write-Host '==> 启动基础设施（MySQL / Redis / etcd / MinIO / Milvus）'
-Compose @('up', '-d', '--wait', 'mysql', 'redis', 'etcd', 'minio', 'milvus')
+Compose -CommandArgs @('up', '-d', '--wait', 'mysql', 'redis', 'etcd', 'minio', 'milvus')
 
 Write-Host '==> 导入建表脚本'
-Compose @('cp', 'docs/sql/schema.sql', 'mysql:/tmp/schema.sql')
-Compose @('exec', '-T', 'mysql', 'sh', '-c', 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" < /tmp/schema.sql')
+Compose -CommandArgs @('cp', 'docs/sql/schema.sql', 'mysql:/tmp/schema.sql')
+Compose -CommandArgs @('exec', '-T', 'mysql', 'sh', '-c', 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" < /tmp/schema.sql')
 
 if ($NoLaunch) {
     Write-Host '==> 基础设施已就绪（-NoLaunch，跳过前后端启动）。'
@@ -57,11 +57,11 @@ $env:REDIS_PORT  = '6379'
 $env:MILVUS_HOST = 'localhost'
 $env:MILVUS_PORT = '19530'
 Start-Process powershell -WorkingDirectory (Join-Path $PSScriptRoot 'backend') `
-    -ArgumentList '-NoExit', '-Command', '.\mvnw.cmd spring-boot:run'
+    -WindowStyle Hidden -ArgumentList '-NoProfile', '-Command', '.\mvnw.cmd spring-boot:run'
 
 Write-Host '==> 启动前端（新窗口）'
 Start-Process powershell -WorkingDirectory (Join-Path $PSScriptRoot 'frontend') `
-    -ArgumentList '-NoExit', '-Command', 'npm run dev'
+    -WindowStyle Hidden -ArgumentList '-NoProfile', '-Command', 'npm run dev'
 
 Write-Host ''
 Write-Host '完成。后端 http://localhost:8080 ，前端 http://localhost:5173'

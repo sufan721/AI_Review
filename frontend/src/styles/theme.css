@@ -10,6 +10,11 @@
   --danger: #d1242f;
   --radius: 8px;
   --font: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --auth-panel: #5040bb;
+  --character-purple: #6c3ff5;
+  --character-dark: #2d2d2d;
+  --character-orange: #ff9b6b;
+  --character-yellow: #e8d754;
 }
 
 * {

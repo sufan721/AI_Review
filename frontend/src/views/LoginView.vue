@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import AnimatedCharacters from '../components/auth/AnimatedCharacters.vue'
 import { useAuthStore } from '../stores/auth'
 import { authApi } from '../api/auth'
 
@@ -20,6 +21,9 @@ const phone = ref('')
 const smsCode = ref('')
 const email = ref('')
 const emailCode = ref('')
+const showPassword = ref(false)
+const typing = ref(false)
+const passwordActive = computed(() => mode.value === 'password' && password.value.length > 0)
 
 const captchaKey = ref('')
 const captchaCode = ref('')
@@ -91,8 +95,20 @@ onMounted(loadCaptcha)
 </script>
 
 <template>
-  <main class="auth">
-    <h1>登录</h1>
+  <main class="login-page">
+    <aside class="login-art">
+      <div class="brand"><span class="brand-mark">✦</span><span>备忘录</span></div>
+      <div class="art-content">
+        <h2>欢迎回来</h2>
+        <p>记录想法，整理知识，让灵感随时触手可及。</p>
+        <AnimatedCharacters :typing="typing" :password-active="passwordActive" :password-visible="showPassword" />
+      </div>
+      <div class="art-footer">你的每一份记录，都值得被认真保存。</div>
+    </aside>
+    <section class="login-main">
+      <div class="auth">
+    <div class="mobile-brand"><span class="brand-mark">✦</span>备忘录</div>
+    <h1>欢迎回来！</h1>
     <p class="hint">登录后即可管理你的笔记与知识库。</p>
     <p v-if="error" class="form-error">{{ error }}</p>
     <div class="tabs">
@@ -104,11 +120,14 @@ onMounted(loadCaptcha)
       <template v-if="mode === 'password'">
         <label class="field">
           用户名
-          <input v-model="username" name="username" autocomplete="username" required />
+          <input v-model="username" name="username" autocomplete="username" required @focus="typing = true" @blur="typing = false" />
         </label>
         <label class="field">
           密码
-          <input v-model="password" name="password" type="password" autocomplete="current-password" required />
+          <span class="password-row">
+            <input v-model="password" name="password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" required @focus="typing = true" @blur="typing = false" />
+            <button type="button" class="password-toggle" :aria-label="showPassword ? '隐藏密码' : '显示密码'" :aria-pressed="showPassword" @click="showPassword = !showPassword">{{ showPassword ? '隐藏' : '显示' }}</button>
+          </span>
         </label>
         <div class="field">
           验证码
@@ -158,30 +177,40 @@ onMounted(loadCaptcha)
     <p v-if="sentHint" class="sent-hint">{{ sentHint }}</p>
     <p class="alt"><RouterLink to="/forgot">忘记密码？</RouterLink></p>
     <p class="alt">还没有账号？<RouterLink to="/register">注册</RouterLink></p>
-    <p class="alt"><a href="/api/auth/sso/mock">统一身份认证登录</a></p>
+    <p class="alt sso"><a href="/api/auth/sso/mock">统一身份认证登录</a></p>
+      </div>
+    </section>
   </main>
 </template>
 
 <style scoped>
+.login-page { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(440px, 1fr); }
+.login-art { position: relative; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; padding: 40px 48px 0; color: white; background: var(--auth-panel); }
+.brand, .mobile-brand { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; }
+.brand-mark { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: rgb(255 255 255 / 16%); }
+.art-content { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1; text-align: center; }
+.art-content h2 { margin: 28px 0 3px; font-size: clamp(28px, 3vw, 40px); }
+.art-content p { margin: 0 0 48px; opacity: .82; }
+.art-footer { padding: 18px 0 28px; font-size: 13px; opacity: .68; }
+.login-main { display: flex; align-items: center; justify-content: center; padding: 48px 32px; }
 .auth {
-  max-width: 360px;
-  margin: 72px auto;
-  padding: 0 20px;
+  width: 100%; max-width: 420px;
 }
 h1 {
-  margin-bottom: 4px;
+  margin: 0 0 4px; text-align: center; font-size: 30px;
 }
 .hint {
-  margin-top: 0;
+  margin: 0 0 32px; text-align: center;
   color: var(--fg-muted);
 }
+.mobile-brand { display: none; justify-content: center; margin-bottom: 48px; }
+.mobile-brand .brand-mark { color: var(--accent); background: var(--bg-soft); }
 .tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 8px; margin-bottom: 24px;
 }
 .tabs button {
-  padding: 6px 14px;
+  flex: 1; padding: 9px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
@@ -190,7 +219,13 @@ h1 {
 .tabs button.active {
   border-color: var(--accent);
   color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg));
 }
+.field { font-size: 14px; font-weight: 600; }
+.field input { width: 100%; min-height: 46px; font-weight: 400; }
+.password-row { position: relative; display: block; }
+.password-row input { padding-right: 60px; }
+.password-toggle { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; color: var(--fg-muted); font-size: 13px; }
 .captcha-row,
 .code-row {
   display: flex;
@@ -212,14 +247,21 @@ h1 {
 }
 .submit {
   width: 100%;
-  margin-top: 4px;
+  margin-top: 6px; min-height: 48px;
 }
 .sent-hint {
   margin-top: 12px;
   color: var(--fg-muted);
 }
 .alt {
-  margin-top: 20px;
+  margin: 14px 0 0; text-align: center;
   color: var(--fg-muted);
+}
+.sso { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+@media (max-width: 1000px) {
+  .login-page { display: block; }
+  .login-art { display: none; }
+  .login-main { min-height: 100vh; }
+  .mobile-brand { display: flex; }
 }
 </style>
