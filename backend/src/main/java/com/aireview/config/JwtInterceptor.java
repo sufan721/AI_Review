@@ -2,10 +2,13 @@ package com.aireview.config;
 
 import com.aireview.common.Result;
 import com.aireview.common.ResultCode;
+import com.aireview.dto.AccessSetting;
 import com.aireview.security.PermissionService;
+import com.aireview.security.PublicAccessRegistry;
 import com.aireview.security.RequirePermission;
 import com.aireview.security.RequireRole;
 import com.aireview.security.TokenService;
+import com.aireview.service.InstanceSettingService;
 import com.aireview.util.JwtUtil;
 import com.aireview.util.UserContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,7 +24,20 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-/** 登录态与权限校验：解析 JWT → 写入 {@link UserContext}，再按注解校验角色/权限。 */
+/**
+ * 登录态与权限校验（对齐 memos Authorizer 的两层结构）。
+ *
+ * <p>第一层（本拦截器）：仅判认证 + 匿名放行。
+ * <ul>
+ *   <li>已认证（有效 JWT 或 PAT）→ 写入 {@link UserContext}，放行；</li>
+ *   <li>匿名 + 引导接口（Bootstrap）→ 恒放行；</li>
+ *   <li>匿名 + 公开资源接口 + {@code ACCESS.mode=PUBLIC} → 放行；</li>
+ *   <li>其余 → 401。</li>
+ * </ul>
+ *
+ * <p>第二层（Service / 注解）：{@link RequireRole} / {@link RequirePermission} 管实例角色，
+ * 资源归属由 OwnershipService 统一校验。本拦截器只在已认证时执行注解校验。
+ */
 @Component
 public class JwtInterceptor implements HandlerInterceptor {
     private static final String BEARER_PREFIX = "Bearer ";
@@ -30,13 +46,18 @@ public class JwtInterceptor implements HandlerInterceptor {
     private final ObjectMapper objectMapper;
     private final TokenService tokenService;
     private final PermissionService permissionService;
+    private final PublicAccessRegistry publicAccessRegistry;
+    private final InstanceSettingService instanceSettingService;
 
     public JwtInterceptor(JwtUtil jwtUtil, ObjectMapper objectMapper, TokenService tokenService,
-        PermissionService permissionService) {
+        PermissionService permissionService, PublicAccessRegistry publicAccessRegistry,
+        InstanceSettingService instanceSettingService) {
         this.jwtUtil = jwtUtil;
         this.objectMapper = objectMapper;
         this.tokenService = tokenService;
         this.permissionService = permissionService;
+        this.publicAccessRegistry = publicAccessRegistry;
+        this.instanceSettingService = instanceSettingService;
     }
 
     @Override
@@ -45,32 +66,46 @@ public class JwtInterceptor implements HandlerInterceptor {
         if (HttpMethod.OPTIONS.matches(request.getMethod())) {
             return true;
         }
-        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-        if (header == null || !header.startsWith(BEARER_PREFIX)) {
-            writeUnauthorized(response);
-            return false;
-        }
-        Claims claims = jwtUtil.parseClaims(header.substring(BEARER_PREFIX.length()));
-        Long userId = parseUserId(claims);
-        if (userId == null) {
-            writeUnauthorized(response);
-            return false;
-        }
-        if (claims.getId() != null && tokenService.isBlacklisted(claims.getId())) {
-            writeUnauthorized(response);
-            return false;
-        }
-        UserContext.set(userId);
 
-        if (!(handler instanceof HandlerMethod handlerMethod)) {
-            writeForbidden(response);
-            return false;
+        // 1) 引导接口恒放行：登录/注册/验证码/SSO/健康/实例 profile 读取
+        if (publicAccessRegistry.isBootstrap(request)) {
+            return true;
         }
-        if (!authorized(userId, handlerMethod)) {
-            writeForbidden(response);
-            return false;
+
+        // 2) 已认证：解析 JWT → UserContext，再按注解校验角色/权限
+        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+        if (header != null && header.startsWith(BEARER_PREFIX)) {
+            Claims claims = jwtUtil.parseClaims(header.substring(BEARER_PREFIX.length()));
+            Long userId = parseUserId(claims);
+            if (userId == null) {
+                writeUnauthorized(response);
+                return false;
+            }
+            if (claims.getId() != null && tokenService.isBlacklisted(claims.getId())) {
+                writeUnauthorized(response);
+                return false;
+            }
+            UserContext.set(userId);
+            if (!(handler instanceof HandlerMethod handlerMethod)) {
+                writeForbidden(response);
+                return false;
+            }
+            if (!authorized(userId, handlerMethod)) {
+                writeForbidden(response);
+                return false;
+            }
+            return true;
         }
-        return true;
+
+        // 3) 匿名：公开资源接口 + ACCESS.mode=PUBLIC 才放行；否则 401
+        if (publicAccessRegistry.isPublicResource(request)) {
+            AccessSetting access = instanceSettingService.getAccess();
+            if (access.isPublic()) {
+                return true;
+            }
+        }
+        writeUnauthorized(response);
+        return false;
     }
 
     private boolean authorized(Long userId, HandlerMethod handlerMethod) {

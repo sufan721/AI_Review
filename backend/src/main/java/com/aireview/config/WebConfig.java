@@ -4,24 +4,15 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+/**
+ * Web MVC 配置。
+ *
+ * <p>所有 {@code /api/**} 都经过 {@link JwtInterceptor}；放行策略集中在拦截器与
+ * {@link com.aireview.security.PublicAccessRegistry}，由其按 Bootstrap / Public
+ * / Protected 三层判定，避免静态白名单无法区分 ACCESS 模式的问题。
+ */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
-    /** 无需登录即可访问的路径。新增公开接口时必须显式加到这里。 */
-    static final String[] PUBLIC_PATHS = {
-        "/api/health",
-        "/api/auth/register",
-        "/api/auth/login",
-        "/api/auth/captcha",
-        "/api/auth/refresh",
-        "/api/auth/sms/send",
-        "/api/auth/sms/login",
-        "/api/auth/email/send",
-        "/api/auth/email/login",
-        "/api/auth/forgot/send-code",
-        "/api/auth/forgot/reset",
-        "/api/auth/sso/login",
-        "/api/auth/sso/mock"
-    };
 
     private final JwtInterceptor jwtInterceptor;
 
@@ -32,7 +23,6 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(jwtInterceptor)
-            .addPathPatterns("/api/**")
-            .excludePathPatterns(PUBLIC_PATHS);
+            .addPathPatterns("/api/**");
     }
 }
