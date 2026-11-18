@@ -2,16 +2,10 @@ package com.aireview.controller;
 
 import com.aireview.common.Result;
 import com.aireview.dto.CaptchaVO;
-import com.aireview.dto.EmailLoginRequest;
-import com.aireview.dto.EmailSendRequest;
-import com.aireview.dto.ForgotResetRequest;
-import com.aireview.dto.ForgotSendCodeRequest;
 import com.aireview.dto.LoginRequest;
 import com.aireview.dto.LoginResponse;
 import com.aireview.dto.RefreshRequest;
 import com.aireview.dto.RegisterRequest;
-import com.aireview.dto.SmsLoginRequest;
-import com.aireview.dto.SmsSendRequest;
 import com.aireview.dto.SsoLoginRequest;
 import com.aireview.dto.UserVO;
 import com.aireview.service.AuthService;
@@ -59,42 +53,6 @@ public class AuthController {
     @PostMapping("/logout")
     public Result<Void> logout(HttpServletRequest http) {
         authService.logout(bearerToken(http));
-        return Result.ok();
-    }
-
-    @PostMapping("/sms/send")
-    public Result<Void> smsSend(@Valid @RequestBody SmsSendRequest request) {
-        authService.smsSend(request);
-        return Result.ok();
-    }
-
-    @PostMapping("/sms/login")
-    public Result<LoginResponse> smsLogin(@Valid @RequestBody SmsLoginRequest request,
-        HttpServletRequest http) {
-        return Result.ok(authService.smsLogin(request, http.getRemoteAddr(), userAgent(http)));
-    }
-
-    @PostMapping("/email/send")
-    public Result<Void> emailSend(@Valid @RequestBody EmailSendRequest request) {
-        authService.emailSend(request);
-        return Result.ok();
-    }
-
-    @PostMapping("/email/login")
-    public Result<LoginResponse> emailLogin(@Valid @RequestBody EmailLoginRequest request,
-        HttpServletRequest http) {
-        return Result.ok(authService.emailLogin(request, http.getRemoteAddr(), userAgent(http)));
-    }
-
-    @PostMapping("/forgot/send-code")
-    public Result<Void> forgotSendCode(@Valid @RequestBody ForgotSendCodeRequest request) {
-        authService.forgotSendCode(request);
-        return Result.ok();
-    }
-
-    @PostMapping("/forgot/reset")
-    public Result<Void> forgotReset(@Valid @RequestBody ForgotResetRequest request) {
-        authService.forgotReset(request);
         return Result.ok();
     }
 

@@ -7,7 +7,7 @@ const emit = defineEmits<{ remove: [resource: KnowledgeBaseResource] }>()
 </script>
 
 <template>
-  <li class="item">
+  <li class="item card-hover">
     <div class="main">
       <span class="name">{{ resource.name ?? '（无标题）' }}</span>
       <span :class="['badge', resource.resourceType === 'NOTE' ? 'badge-note' : 'badge-doc']">

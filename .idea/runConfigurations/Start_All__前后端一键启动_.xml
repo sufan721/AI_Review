@@ -1,0 +1,8 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Start All (前后端一键启动)" type="CompoundRunConfigurationType">
+    <toRun name="Infra (Docker 基础设施)" type="ShConfigurationType" />
+    <toRun name="Backend (Maven 通用)" type="ShConfigurationType" />
+    <toRun name="Frontend (Vite)" type="js.build_tools.npm" />
+    <method v="2" />
+  </configuration>
+</component>

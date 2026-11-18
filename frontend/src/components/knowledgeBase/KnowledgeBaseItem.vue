@@ -6,7 +6,7 @@ defineProps<{ knowledgeBase: KnowledgeBase }>()
 </script>
 
 <template>
-  <li class="item">
+  <li class="item card-hover">
     <RouterLink class="link" :to="{ name: 'knowledge-base-detail', params: { id: String(knowledgeBase.id) } }">
       <span class="main">
         <strong class="name">{{ knowledgeBase.name }}</strong>
@@ -33,6 +33,7 @@ defineProps<{ knowledgeBase: KnowledgeBase }>()
   gap: 16px;
   padding: 14px 16px;
   color: var(--fg);
+  transition: background-color 0.18s ease;
 }
 .link:hover {
   background: var(--bg-soft);

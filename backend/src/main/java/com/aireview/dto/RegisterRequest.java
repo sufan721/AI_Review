@@ -1,6 +1,5 @@
 package com.aireview.dto;
 
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -12,25 +11,7 @@ public record RegisterRequest(
     String username,
 
     @NotBlank(message = "密码不能为空")
-    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,32}$",
-        message = "密码需 8-32 位，含大小写字母、数字和特殊字符")
-    String password,
-
-    @NotBlank(message = "确认密码不能为空")
-    String confirmPassword,
-
-    @NotBlank(message = "手机号不能为空")
-    @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
-    String phone,
-
-    @NotBlank(message = "短信验证码不能为空")
-    String smsCode,
-
-    @Size(max = 64, message = "昵称不能超过 64 个字符")
-    String nickname,
-
-    @Email(message = "邮箱格式不正确")
-    @Size(max = 128, message = "邮箱长度不合法")
-    String email
+    @Size(max = 64, message = "密码长度不能超过 64 个字符")
+    String password
 ) {
 }

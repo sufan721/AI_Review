@@ -25,8 +25,6 @@ import org.springframework.test.web.servlet.MockMvc;
 class AuthAdvancedTest extends AbstractIntegrationTest {
     private static final String CAPTCHA_KEY = "test-captcha";
     private static final String PASSWORD = "Secret123!";
-    private static final String SMS_CODE = "123456";
-    private int phoneSeq = 0;
 
     @Autowired
     private MockMvc mockMvc;
@@ -46,88 +44,6 @@ class AuthAdvancedTest extends AbstractIntegrationTest {
         jdbcTemplate.execute("TRUNCATE TABLE `sys_user_sso_binding`");
         jdbcTemplate.execute("TRUNCATE TABLE `sys_login_log`");
         jdbcTemplate.execute("TRUNCATE TABLE `user`");
-    }
-
-    @Test
-    void smsLoginWithValidCodeReturnsToken() throws Exception {
-        registerWithPhone("alice", "13800138001");
-        store.put("sms:code:13800138001", "123456", Duration.ofMinutes(5));
-
-        mockMvc.perform(post("/api/auth/sms/login")
-                .contentType(APPLICATION_JSON)
-                .content(smsLogin("13800138001", "123456")))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.accessToken").isNotEmpty());
-    }
-
-    @Test
-    void smsCodeIsSingleUse() throws Exception {
-        registerWithPhone("alice", "13800138002");
-        store.put("sms:code:13800138002", "123456", Duration.ofMinutes(5));
-
-        mockMvc.perform(post("/api/auth/sms/login")
-                .contentType(APPLICATION_JSON)
-                .content(smsLogin("13800138002", "123456")))
-            .andExpect(status().isOk());
-
-        mockMvc.perform(post("/api/auth/sms/login")
-                .contentType(APPLICATION_JSON)
-                .content(smsLogin("13800138002", "123456")))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value(400));
-    }
-
-    @Test
-    void smsSendIsRateLimited() throws Exception {
-        String phone = "13800138003";
-        mockMvc.perform(post("/api/auth/sms/send")
-                .contentType(APPLICATION_JSON)
-                .content(objectMapper.createObjectNode().put("phone", phone).toString()))
-            .andExpect(status().isOk());
-
-        mockMvc.perform(post("/api/auth/sms/send")
-                .contentType(APPLICATION_JSON)
-                .content(objectMapper.createObjectNode().put("phone", phone).toString()))
-            .andExpect(status().isTooManyRequests());
-    }
-
-    @Test
-    void emailLoginWithValidCodeReturnsToken() throws Exception {
-        registerWithEmail("bob", "bob@example.com");
-        store.put("mail:code:bob@example.com", "654321", Duration.ofMinutes(5));
-
-        mockMvc.perform(post("/api/auth/email/login")
-                .contentType(APPLICATION_JSON)
-                .content(emailLogin("bob@example.com", "654321")))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.accessToken").isNotEmpty());
-    }
-
-    @Test
-    void forgotPasswordResetsAndNewPasswordWorks() throws Exception {
-        registerWithEmail("carol", "carol@example.com");
-        store.put("reset:code:carol@example.com", "111111", Duration.ofMinutes(10));
-
-        mockMvc.perform(post("/api/auth/forgot/reset")
-                .contentType(APPLICATION_JSON)
-                .content(forgotReset("carol@example.com", "111111", "NewSecret123!")))
-            .andExpect(status().isOk());
-
-        seedCaptcha();
-        mockMvc.perform(post("/api/auth/login")
-                .contentType(APPLICATION_JSON)
-                .content(loginCredentials("carol", "NewSecret123!")))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.accessToken").isNotEmpty());
-    }
-
-    @Test
-    void forgotSendCodeDoesNotRevealAccountExistence() throws Exception {
-        mockMvc.perform(post("/api/auth/forgot/send-code")
-                .contentType(APPLICATION_JSON)
-                .content(objectMapper.createObjectNode().put("account", "nobody@example.com").toString()))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(0));
     }
 
     @Test
@@ -217,29 +133,9 @@ class AuthAdvancedTest extends AbstractIntegrationTest {
     }
 
     private JsonNode register(String username) throws Exception {
-        return register(username, null, null);
-    }
-
-    private void registerWithPhone(String username, String phone) throws Exception {
-        register(username, phone, null);
-    }
-
-    private void registerWithEmail(String username, String email) throws Exception {
-        register(username, null, email);
-    }
-
-    private JsonNode register(String username, String phone, String email) throws Exception {
-        String effectivePhone = phone == null ? nextPhone() : phone;
-        store.put("sms:code:" + effectivePhone, SMS_CODE, Duration.ofMinutes(5));
         ObjectNode node = objectMapper.createObjectNode()
             .put("username", username)
-            .put("password", PASSWORD)
-            .put("confirmPassword", PASSWORD)
-            .put("phone", effectivePhone)
-            .put("smsCode", SMS_CODE);
-        if (email != null) {
-            node.put("email", email);
-        }
+            .put("password", PASSWORD);
         String body = mockMvc.perform(post("/api/auth/register")
                 .contentType(APPLICATION_JSON)
                 .content(node.toString()))
@@ -248,16 +144,8 @@ class AuthAdvancedTest extends AbstractIntegrationTest {
         return objectMapper.readTree(body).path("data");
     }
 
-    private String nextPhone() {
-        return String.format("138%08d", ++phoneSeq);
-    }
-
     private void seedCaptcha() {
         store.put("captcha:" + CAPTCHA_KEY, "7", Duration.ofMinutes(5));
-    }
-
-    private String smsLogin(String phone, String code) {
-        return objectMapper.createObjectNode().put("phone", phone).put("smsCode", code).toString();
     }
 
     private String ssoLogin(String provider, String subject, String username, String email) {
@@ -266,19 +154,6 @@ class AuthAdvancedTest extends AbstractIntegrationTest {
             .put("subject", subject)
             .put("username", username)
             .put("email", email)
-            .toString();
-    }
-
-    private String emailLogin(String email, String code) {
-        return objectMapper.createObjectNode().put("email", email).put("emailCode", code).toString();
-    }
-
-    private String forgotReset(String account, String code, String newPassword) {
-        return objectMapper.createObjectNode()
-            .put("account", account)
-            .put("resetCode", code)
-            .put("newPassword", newPassword)
-            .put("confirmPassword", newPassword)
             .toString();
     }
 

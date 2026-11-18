@@ -1,0 +1,31 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="Eslint" enabled="true" level="WARNING" enabled_by_default="true" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="numpy" />
+          <option value="aiohttp" />
+          <option value="requests" />
+          <option value="chardet" />
+          <option value="Pillow" />
+          <option value="web.py" />
+          <option value="python-dotenv" />
+          <option value="PyYAML" />
+          <option value="croniter" />
+          <option value="click" />
+          <option value="qrcode" />
+          <option value="json-repair" />
+          <option value="wechatpy" />
+          <option value="zai-sdk" />
+          <option value="dashscope" />
+          <option value="lark-oapi" />
+          <option value="dingtalk_stream" />
+          <option value="websocket-client" />
+          <option value="pycryptodome" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>

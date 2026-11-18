@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Infra (Docker 基础设施)" type="ShConfigurationType">
+    <option name="SCRIPT_TEXT" value="docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --wait mysql redis etcd minio milvus" />
+    <option name="SCRIPT_PATH" value="" />
+    <option name="SCRIPT_OPTIONS" value="" />
+    <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="INTERPRETER_PATH" value="powershell.exe" />
+    <option name="INTERPRETER_OPTIONS" value="" />
+    <option name="EXECUTE_IN_TERMINAL" value="false" />
+    <option name="EXECUTE_SCRIPT_FILE" value="false" />
+    <method v="2" />
+  </configuration>
+</component>

@@ -7,11 +7,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.aireview.security.AuthStateStore;
 import com.aireview.support.AbstractIntegrationTest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,11 +21,8 @@ class DocumentControllerTest extends AbstractIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
-    @Autowired private AuthStateStore store;
 
     private static final String PASSWORD = "Secret123!";
-    private static final String SMS_CODE = "123456";
-    private int phoneSeq = 0;
 
     private String aliceToken;
     private String bobToken;
@@ -86,14 +81,9 @@ class DocumentControllerTest extends AbstractIntegrationTest {
     }
 
     private String register(String username) throws Exception {
-        String phone = String.format("138%08d", ++phoneSeq);
-        store.put("sms:code:" + phone, SMS_CODE, Duration.ofMinutes(5));
         String credentials = objectMapper.createObjectNode()
             .put("username", username)
             .put("password", PASSWORD)
-            .put("confirmPassword", PASSWORD)
-            .put("phone", phone)
-            .put("smsCode", SMS_CODE)
             .toString();
         String body = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/auth/register")
                 .contentType(APPLICATION_JSON).content(credentials))

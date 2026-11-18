@@ -189,3 +189,59 @@ CREATE TABLE IF NOT EXISTS `knowledge_base_resource` (
   UNIQUE KEY `uk_kb_resource` (`knowledge_base_id`, `resource_type`, `resource_id`),
   KEY `idx_resource` (`resource_type`, `resource_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='知识库资料关联';
+
+-- 用户设置 / 访问令牌 / 身份源 / 实例设置（memos 迁移中保留下来的部分）
+
+CREATE TABLE IF NOT EXISTS `user_setting` (
+  `id`      BIGINT      NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT      NOT NULL,
+  `key`     VARCHAR(32) NOT NULL COMMENT 'GENERAL/TAGS/EDITOR/WEBHOOKS',
+  `value`   JSON        DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_setting` (`user_id`, `key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户设置';
+
+CREATE TABLE IF NOT EXISTS `personal_access_token` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT,
+  `uid`        VARCHAR(36)  NOT NULL,
+  `user_id`    BIGINT       NOT NULL,
+  `token_hash` VARCHAR(64)  NOT NULL COMMENT 'SHA-256 摘要',
+  `description` VARCHAR(255) DEFAULT NULL,
+  `created_at` BIGINT       NOT NULL COMMENT 'epoch 毫秒',
+  `expires_ts` BIGINT       DEFAULT NULL COMMENT 'epoch 毫秒',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_pat_uid` (`uid`),
+  KEY `idx_pat_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='个人访问令牌';
+
+CREATE TABLE IF NOT EXISTS `user_identity` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT,
+  `user_id`    BIGINT       NOT NULL,
+  `provider`   VARCHAR(64)  NOT NULL COMMENT '身份源 uid',
+  `extern_uid` VARCHAR(255) NOT NULL COMMENT '外部唯一标识',
+  `created_at` BIGINT       NOT NULL COMMENT 'epoch 毫秒',
+  `updated_at` BIGINT       NOT NULL COMMENT 'epoch 毫秒',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_identity` (`provider`, `extern_uid`),
+  KEY `idx_identity_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户 SSO 身份';
+
+CREATE TABLE IF NOT EXISTS `identity_provider` (
+  `id`                BIGINT       NOT NULL AUTO_INCREMENT,
+  `uid`               VARCHAR(36)  NOT NULL,
+  `name`              VARCHAR(128) NOT NULL,
+  `type`              VARCHAR(32)  NOT NULL COMMENT 'OAUTH2/OIDC',
+  `identifier_filter` VARCHAR(255) DEFAULT NULL,
+  `config`            JSON         DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_idp_uid` (`uid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='身份源';
+
+CREATE TABLE IF NOT EXISTS `instance_setting` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT,
+  `name`        VARCHAR(64)  NOT NULL COMMENT 'BASIC/GENERAL/STORAGE/TAGS/NOTIFICATION/ACCESS/USAGE_LIMITS',
+  `value`       JSON         DEFAULT NULL,
+  `description` VARCHAR(255) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_instance_setting_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='实例设置';

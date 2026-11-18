@@ -29,7 +29,8 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
-# IDE metadata
-.idea/
+# WorkBuddy local working data (backups, memory)
+.workbuddy/
+
+# IDE metadata (.idea/ is tracked so run configs and project settings are shared)
 .vscode/
-*.iml

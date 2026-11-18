@@ -25,6 +25,12 @@ public class User {
 
     private String realName;
 
+    /** 个人描述（memos 语义）。 */
+    private String description;
+
+    /** 头像 URL（memos 语义）。 */
+    private String avatarUrl;
+
     /** 1 正常，0 禁用。 */
     private Integer status;
 
