@@ -18,7 +18,7 @@ public class CaptchaService {
     private final boolean enabled;
 
     public CaptchaService(AuthStateStore store,
-        @Value("${ai-review.auth.captcha-enabled:true}") boolean enabled) {
+        @Value("${ai-review.auth.captcha-enabled:false}") boolean enabled) {
         this.store = store;
         this.enabled = enabled;
     }

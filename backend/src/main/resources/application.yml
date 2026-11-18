@@ -36,8 +36,8 @@ ai-review:
   auth:
     # 状态存储：redis（生产） / memory（测试或单机轻量部署，不依赖 Redis）
     store: ${AUTH_STORE:redis}
-    # 密码登录/注册是否校验图形验证码
-    captcha-enabled: ${AUTH_CAPTCHA_ENABLED:true}
+    # 密码登录是否校验图形验证码（默认关闭，需要时用 AUTH_CAPTCHA_ENABLED=true 打开）
+    captcha-enabled: ${AUTH_CAPTCHA_ENABLED:false}
     # 邮件验证码是否走真实 SMTP；关闭时与短信一致降级为控制台打印
     mail-enabled: ${AUTH_MAIL_ENABLED:false}
     # SSO 模拟 IdP 登录页在前端回跳的地址（带协议），用于演示完整 OIDC 回调
