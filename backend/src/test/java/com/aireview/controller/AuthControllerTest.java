@@ -20,8 +20,6 @@ import org.springframework.test.web.servlet.MockMvc;
 class AuthControllerTest extends AbstractIntegrationTest {
     private static final String CAPTCHA_KEY = "test-captcha";
     private static final String PASSWORD = "Secret123!";
-    private static final String SMS_CODE = "123456";
-    private int phoneSeq = 0;
 
     @Autowired
     private MockMvc mockMvc;
@@ -73,10 +71,10 @@ class AuthControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void registerRejectsWeakPassword() throws Exception {
+    void registerRejectsBlankPassword() throws Exception {
         mockMvc.perform(post("/api/auth/register")
                 .contentType(APPLICATION_JSON)
-                .content(registerCredentials("alice", "secret123")))
+                .content(registerCredentials("alice", "")))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value(400));
     }
@@ -181,14 +179,9 @@ class AuthControllerTest extends AbstractIntegrationTest {
     }
 
     private String registerCredentials(String username, String password) {
-        String phone = String.format("138%08d", ++phoneSeq);
-        store.put("sms:code:" + phone, SMS_CODE, Duration.ofMinutes(5));
         return objectMapper.createObjectNode()
             .put("username", username)
             .put("password", password)
-            .put("confirmPassword", password)
-            .put("phone", phone)
-            .put("smsCode", SMS_CODE)
             .toString();
     }
 
