@@ -3,6 +3,7 @@ package com.aireview.service.impl;
 import com.aireview.common.BusinessException;
 import com.aireview.common.ResultCode;
 import com.aireview.dto.CaptchaVO;
+import com.aireview.dto.ChangePasswordRequest;
 import com.aireview.dto.GeneralSetting;
 import com.aireview.dto.LoginRequest;
 import com.aireview.dto.LoginResponse;
@@ -171,6 +172,22 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ResultCode.UNAUTHORIZED);
         }
         return tokenService.toVO(user);
+    }
+
+    @Override
+    public void changePassword(ChangePasswordRequest request) {
+        Long userId = UserContext.require();
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED);
+        }
+        // 旧密码校验失败统一返回 401，避免通过状态码探测
+        if (!passwordEncoder.matches(request.oldPassword(), user.getPasswordHash())) {
+            throw new BusinessException(ResultCode.LOGIN_FAILED);
+        }
+        // 写入新哈希并自增 token_version，旧 JWT 立即失效
+        userMapper.updatePasswordAndBumpVersion(userId, passwordEncoder.encode(request.newPassword()));
+        log.info("用户改密码成功 userId={}", userId);
     }
 
     private void handleFail(User user, String ip, String userAgent) {

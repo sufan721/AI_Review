@@ -2,6 +2,7 @@ package com.aireview.controller;
 
 import com.aireview.common.Result;
 import com.aireview.dto.CaptchaVO;
+import com.aireview.dto.ChangePasswordRequest;
 import com.aireview.dto.LoginRequest;
 import com.aireview.dto.LoginResponse;
 import com.aireview.dto.RefreshRequest;
@@ -65,6 +66,12 @@ public class AuthController {
     @GetMapping("/me")
     public Result<UserVO> me() {
         return Result.ok(authService.currentUser());
+    }
+
+    @PostMapping("/change-password")
+    public Result<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(request);
+        return Result.ok(null);
     }
 
     private static String userAgent(HttpServletRequest request) {

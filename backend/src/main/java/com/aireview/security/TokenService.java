@@ -36,7 +36,8 @@ public class TokenService {
     }
 
     public LoginResponse issue(User user) {
-        String accessToken = jwtUtil.generateToken(user.getId());
+        int tokenVersion = user.getTokenVersion() == null ? 0 : user.getTokenVersion();
+        String accessToken = jwtUtil.generateToken(user.getId(), tokenVersion);
         String refreshToken = UUID.randomUUID().toString();
         store.put(REFRESH_PREFIX + refreshToken, String.valueOf(user.getId()),
             Duration.ofSeconds(refreshTtlSeconds));
@@ -70,6 +71,20 @@ public class TokenService {
 
     public boolean isBlacklisted(String jti) {
         return store.exists(BLACKLIST_PREFIX + jti);
+    }
+
+    /**
+     * 校验 JWT 携带的会话版本号是否与库中一致。
+     * 改密码/管理员重置密码时 token_version+1，旧 token tv 不一致即失效。
+     * 用户禁用或不存在也视为失效。
+     */
+    public boolean isTokenVersionValid(Long userId, int tokenVersion) {
+        User user = userMapper.selectById(userId);
+        if (user == null || !Integer.valueOf(1).equals(user.getStatus())) {
+            return false;
+        }
+        int current = user.getTokenVersion() == null ? 0 : user.getTokenVersion();
+        return current == tokenVersion;
     }
 
     public UserVO toVO(User user) {

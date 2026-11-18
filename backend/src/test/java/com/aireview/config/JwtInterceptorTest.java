@@ -2,6 +2,7 @@ package com.aireview.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -50,6 +51,8 @@ class JwtInterceptorTest {
         // 默认所有请求都不是引导接口、都不是公开资源；具体用例按需覆盖
         when(publicAccessRegistry.isBootstrap(any())).thenReturn(false);
         when(publicAccessRegistry.isPublicResource(any())).thenReturn(false);
+        // 默认会话版本号校验通过；tv 失效用例按需覆盖
+        when(tokenService.isTokenVersionValid(anyLong(), anyInt())).thenReturn(true);
         interceptor = new JwtInterceptor(jwtUtil, new ObjectMapper(), tokenService, permissionService,
             publicAccessRegistry, instanceSettingService, patService);
     }
@@ -176,6 +179,18 @@ class JwtInterceptorTest {
 
         assertThat(interceptor.preHandle(request, response, handler)).isFalse();
         assertThat(response.getStatus()).isEqualTo(403);
+    }
+
+    @Test
+    void jwtWithStaleTokenVersionIsRejected() throws Exception {
+        MockHttpServletRequest request = requestWithToken();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        // 模拟改密码后 token_version+1，旧 token tv 不一致
+        when(tokenService.isTokenVersionValid(1L, 0)).thenReturn(false);
+        HandlerMethod handler = new HandlerMethod(new ProbeController(), ProbeController.class.getMethod("open"));
+
+        assertThat(interceptor.preHandle(request, response, handler)).isFalse();
+        assertThat(response.getStatus()).isEqualTo(401);
     }
 
     private MockHttpServletRequest requestWithToken() {

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS `user` (
   `real_name`     VARCHAR(64)  DEFAULT NULL COMMENT '真实姓名',
   `description`   VARCHAR(255) DEFAULT NULL COMMENT '个人描述（memos 语义）',
   `avatar_url`    VARCHAR(512) DEFAULT NULL COMMENT '头像 URL（memos 语义）',
+  `token_version` INT          NOT NULL DEFAULT 0 COMMENT '会话版本号，改密码/重置时+1，旧 JWT 失效',
   `status`        TINYINT      NOT NULL DEFAULT 1 COMMENT '1正常 0禁用',
   `fail_count`    INT          NOT NULL DEFAULT 0 COMMENT '连续登录失败次数',
   `lock_until`    DATETIME     DEFAULT NULL COMMENT '锁定截止时间',

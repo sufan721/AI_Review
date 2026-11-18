@@ -100,7 +100,7 @@ public class JwtInterceptor implements HandlerInterceptor {
                 return true;
             }
 
-            // JWT 分支：解析 claims，校验黑名单
+            // JWT 分支：解析 claims，校验黑名单与会话版本号
             Claims claims = jwtUtil.parseClaims(token);
             Long userId = parseUserId(claims);
             if (userId == null) {
@@ -108,6 +108,12 @@ public class JwtInterceptor implements HandlerInterceptor {
                 return false;
             }
             if (claims.getId() != null && tokenService.isBlacklisted(claims.getId())) {
+                writeUnauthorized(response);
+                return false;
+            }
+            // 会话版本号校验：改密码/重置后 token_version+1，旧 token tv 不一致即 401
+            int tokenVersion = jwtUtil.parseTokenVersion(claims);
+            if (!tokenService.isTokenVersionValid(userId, tokenVersion)) {
                 writeUnauthorized(response);
                 return false;
             }
