@@ -32,10 +32,5 @@ Thumbs.db
 # WorkBuddy local working data (backups, memory)
 .workbuddy/
 
-# IDE metadata
-.idea/*
-!.idea/runConfigurations/
-.idea/runConfigurations/*
-!.idea/runConfigurations/*.xml
+# IDE metadata (.idea/ is tracked so run configs and project settings are shared)
 .vscode/
-*.iml
