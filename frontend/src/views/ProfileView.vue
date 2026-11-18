@@ -1,15 +1,35 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { authApi } from '../api/auth'
+import { instanceSettingApi } from '../api/admin'
+import { useAuthStore } from '../stores/auth'
 import { useUserStore } from '../stores/user'
+import type { GeneralSetting } from '../types/admin'
+import type { UpdateProfilePayload } from '../types/user'
 
 const user = useUserStore()
+const auth = useAuthStore()
+const router = useRouter()
 
+const username = ref('')
 const displayName = ref('')
 const description = ref('')
 const avatarUrl = ref('')
 const error = ref('')
 const saved = ref(false)
 const saving = ref(false)
+const policy = ref<GeneralSetting>({
+  disallowUserRegistration: false,
+  disallowPasswordAuth: false,
+  forbidChangeUsername: false,
+  forbidChangeNickname: false,
+})
+
+const oldPassword = ref('')
+const newPassword = ref('')
+const passwordError = ref('')
+const passwordSaving = ref(false)
 
 const previewUrl = computed(() => avatarUrl.value.trim())
 const initial = computed(() =>
@@ -28,28 +48,65 @@ async function run(action: () => Promise<void>): Promise<void> {
 
 function load(): Promise<void> {
   return run(async () => {
-    const profile = await user.fetchProfile()
+    const [profile, general] = await Promise.all([
+      user.fetchProfile(),
+      instanceSettingApi.general(),
+    ])
+    username.value = profile.username
     displayName.value = profile.displayName ?? ''
     description.value = profile.description ?? ''
     avatarUrl.value = profile.avatarUrl ?? ''
+    policy.value = general
   })
 }
 
 async function save(): Promise<void> {
   saved.value = false
+  const payload: UpdateProfilePayload = {
+    description: description.value,
+    avatarUrl: avatarUrl.value,
+  }
+  // 被实例策略禁止的字段不提交，避免后端直接 403
+  if (!policy.value.forbidChangeUsername && username.value.trim() !== '') {
+    payload.username = username.value.trim()
+  }
+  if (!policy.value.forbidChangeNickname) {
+    payload.displayName = displayName.value
+  }
   await run(async () => {
     saving.value = true
     try {
-      await user.updateProfile({
-        displayName: displayName.value,
-        description: description.value,
-        avatarUrl: avatarUrl.value,
-      })
+      await user.updateProfile(payload)
       saved.value = true
     } finally {
       saving.value = false
     }
   })
+}
+
+async function changePassword(): Promise<void> {
+  passwordError.value = ''
+  if (oldPassword.value === '' || newPassword.value === '') {
+    passwordError.value = '请填写旧密码与新密码'
+    return
+  }
+  if (newPassword.value.length < 6 || newPassword.value.length > 64) {
+    passwordError.value = '新密码长度需在 6-64 之间'
+    return
+  }
+  passwordSaving.value = true
+  try {
+    await authApi.changePassword(oldPassword.value, newPassword.value)
+    oldPassword.value = ''
+    newPassword.value = ''
+    // 改密码后 token_version+1，旧令牌全部失效，主动登出回到登录页
+    auth.logout()
+    await router.replace({ name: 'login' })
+  } catch (caught) {
+    passwordError.value = caught instanceof Error ? caught.message : '修改密码失败'
+  } finally {
+    passwordSaving.value = false
+  }
 }
 
 function formatTime(ts: number): string {
@@ -115,8 +172,28 @@ onMounted(load)
 
         <div class="card__body">
           <label class="field">
+            <span>登录用户名</span>
+            <input
+              v-model="username"
+              class="control"
+              type="text"
+              maxlength="32"
+              placeholder="3-32 位"
+              :disabled="policy.forbidChangeUsername"
+            />
+            <small v-if="policy.forbidChangeUsername" class="field-note">管理员已禁止修改用户名</small>
+          </label>
+          <label class="field">
             <span>显示名称</span>
-            <input v-model="displayName" type="text" maxlength="64" placeholder="例如：张三" />
+            <input
+              v-model="displayName"
+              class="control"
+              type="text"
+              maxlength="64"
+              placeholder="例如：张三"
+              :disabled="policy.forbidChangeNickname"
+            />
+            <small v-if="policy.forbidChangeNickname" class="field-note">管理员已禁止修改昵称</small>
           </label>
           <label class="field">
             <span>个人描述</span>
@@ -125,7 +202,7 @@ onMounted(load)
           </label>
           <label class="field">
             <span>头像 URL</span>
-            <input v-model="avatarUrl" type="text" maxlength="512" placeholder="https://…" />
+            <input v-model="avatarUrl" class="control" type="text" maxlength="512" placeholder="https://…" />
           </label>
         </div>
 
@@ -136,6 +213,31 @@ onMounted(load)
           <div class="spacer" />
           <button class="btn btn-primary" type="button" :disabled="saving" @click="save">
             {{ saving ? '保存中…' : '保存资料' }}
+          </button>
+        </div>
+      </section>
+
+      <section class="card security-card">
+        <div class="card__head">
+          <h2 class="card__title">修改密码</h2>
+          <span class="card__hint">修改后需要重新登录</span>
+        </div>
+        <div class="card__body">
+          <p v-if="passwordError !== ''" class="form-error">{{ passwordError }}</p>
+          <label class="field">
+            <span>旧密码</span>
+            <input v-model="oldPassword" class="control" type="password" autocomplete="current-password" placeholder="请输入当前密码" />
+          </label>
+          <label class="field">
+            <span>新密码</span>
+            <input v-model="newPassword" class="control" type="password" autocomplete="new-password" placeholder="6-64 位" />
+          </label>
+        </div>
+        <div class="card__foot">
+          <span class="card__hint">管理员也在此修改自己的密码</span>
+          <div class="spacer" />
+          <button class="btn btn-primary btn-sm" type="button" :disabled="passwordSaving" @click="changePassword">
+            {{ passwordSaving ? '修改中…' : '修改密码' }}
           </button>
         </div>
       </section>
@@ -234,11 +336,25 @@ onMounted(load)
   padding-bottom: var(--space-2);
 }
 
-.counter {
+/* 修改密码卡跨满右侧整列 */
+.security-card {
+  grid-column: 2;
+}
+
+.security-card .card__body {
+  padding-bottom: var(--space-2);
+}
+
+.counter,
+.field-note {
   align-self: flex-end;
   color: var(--fg-subtle);
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
+}
+
+.field-note {
+  color: var(--warning);
 }
 
 .card__foot {
@@ -288,6 +404,10 @@ onMounted(load)
 @media (max-width: 820px) {
   .layout {
     grid-template-columns: 1fr;
+  }
+
+  .security-card {
+    grid-column: 1;
   }
 }
 </style>

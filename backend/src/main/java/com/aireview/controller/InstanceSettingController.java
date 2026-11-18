@@ -61,7 +61,9 @@ public class InstanceSettingController {
     public Result<GeneralSetting> updateGeneral(@RequestBody GeneralSettingRequest request) {
         GeneralSetting setting = new GeneralSetting(
             request.disallowUserRegistration(),
-            request.disallowPasswordAuth());
+            request.disallowPasswordAuth(),
+            request.forbidChangeUsername(),
+            request.forbidChangeNickname());
         return Result.ok(instanceSettingService.upsertGeneral(setting));
     }
 
@@ -83,7 +85,10 @@ public class InstanceSettingController {
     public record InstanceSettingRequest(String value, String description) {
     }
 
-    public record GeneralSettingRequest(boolean disallowUserRegistration, boolean disallowPasswordAuth) {
+    public record GeneralSettingRequest(boolean disallowUserRegistration,
+        boolean disallowPasswordAuth,
+        boolean forbidChangeUsername,
+        boolean forbidChangeNickname) {
     }
 
     public record AccessModeRequest(String mode) {

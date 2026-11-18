@@ -6,18 +6,22 @@ import com.aireview.entity.User;
 import com.aireview.mapper.UserMapper;
 import com.aireview.security.RequireRole;
 import com.aireview.service.AdminUserService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 管理员用户管理接口：列出用户、授予/撤销 ADMIN、改状态、删号。
+ * 管理员用户管理接口：列出用户、授予/撤销 ADMIN、改状态、删号、重置密码、改用户名。
  * 全部需要 ROLE_ADMIN；写操作带「最后一个活跃 admin 保护」。
  */
 @RestController
@@ -35,9 +39,16 @@ public class AdminController {
     @RequireRole("ROLE_ADMIN")
     public Result<List<AdminUserVO>> users() {
         List<AdminUserVO> users = userMapper.selectList(null).stream()
-            .map(AdminController::toVO)
+            .map(u -> toVO(u, userMapper.selectRoleCodes(u.getId())))
             .toList();
         return Result.ok(users);
+    }
+
+    @PostMapping("/users")
+    @RequireRole("ROLE_ADMIN")
+    public Result<AdminUserVO> createUser(@Valid @RequestBody AdminCreateUserRequest request) {
+        Long id = adminUserService.createUser(request.username(), request.password());
+        return Result.ok(toVO(userMapper.selectById(id), userMapper.selectRoleCodes(id)));
     }
 
     @PostMapping("/users/{id}/roles/admin")
@@ -69,7 +80,39 @@ public class AdminController {
         return Result.ok(null);
     }
 
-    private static AdminUserVO toVO(User user) {
-        return new AdminUserVO(user.getId(), user.getUsername(), user.getNickname(), user.getStatus());
+    /** 管理员重置用户密码（不校验旧密码）。 */
+    @PutMapping("/users/{id}/password")
+    @RequireRole("ROLE_ADMIN")
+    public Result<Void> changePassword(@PathVariable Long id,
+        @Valid @RequestBody AdminChangePasswordRequest request) {
+        adminUserService.changePassword(id, request.newPassword());
+        return Result.ok(null);
+    }
+
+    /** 管理员修改用户登录用户名。 */
+    @PutMapping("/users/{id}/username")
+    @RequireRole("ROLE_ADMIN")
+    public Result<Void> changeUsername(@PathVariable Long id,
+        @Valid @RequestBody AdminChangeUsernameRequest request) {
+        adminUserService.changeUsername(id, request.newUsername());
+        return Result.ok(null);
+    }
+
+    private static AdminUserVO toVO(User user, List<String> roles) {
+        return new AdminUserVO(user.getId(), user.getUsername(), user.getNickname(),
+            user.getStatus(), roles == null ? List.of() : roles);
+    }
+
+    public record AdminCreateUserRequest(
+        @NotBlank @Size(min = 3, max = 32, message = "用户名长度需在 3-32 之间") String username,
+        @NotBlank @Size(min = 6, max = 64, message = "密码长度需在 6-64 之间") String password) {
+    }
+
+    public record AdminChangePasswordRequest(
+        @NotBlank @Size(min = 6, max = 64, message = "密码长度需在 6-64 之间") String newPassword) {
+    }
+
+    public record AdminChangeUsernameRequest(
+        @NotBlank @Size(min = 3, max = 32, message = "用户名长度需在 3-32 之间") String newUsername) {
     }
 }

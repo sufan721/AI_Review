@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AuthShell from '../components/auth/AuthShell.vue'
+import { instanceApi } from '../api/admin'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -14,6 +15,16 @@ const showPassword = ref(false)
 const isTyping = ref(false)
 const submitting = ref(false)
 const error = ref('')
+const firstRun = ref(false)
+
+onMounted(async () => {
+  try {
+    const status = await instanceApi.bootstrap()
+    firstRun.value = !status.initialized
+  } catch {
+    // 引导接口失败时按常规登录展示，不阻塞登录
+  }
+})
 
 async function submit() {
   if (username.value.trim() === '' || password.value === '' || submitting.value) return
@@ -35,11 +46,16 @@ async function submit() {
 <template>
   <AuthShell
     title="欢迎回来"
-    subtitle="登录后继续管理你的笔记与知识库"
+    :subtitle="firstRun ? '首次注册，请注册管理员' : '登录后继续管理你的笔记与知识库'"
     :show-password="showPassword"
     :password-length="password.length"
     :is-typing="isTyping"
   >
+    <div v-if="firstRun" class="bootstrap-hint" role="note">
+      <strong>首次注册，请注册管理员</strong>
+      <span>当前实例还没有任何用户，请先注册一个管理员账号。</span>
+    </div>
+
     <form class="auth-form" @submit.prevent="submit">
       <div class="auth-field">
         <label class="auth-label" for="login-username">用户名</label>
@@ -109,6 +125,39 @@ async function submit() {
       </button>
     </form>
 
-    <p class="auth-alt">还没有账号？<RouterLink to="/register">注册</RouterLink></p>
+    <p v-if="firstRun" class="auth-alt first-run-alt">
+      还没有管理员？<RouterLink to="/register">首次注册，请注册管理员</RouterLink>
+    </p>
+    <p v-else class="auth-alt">还没有账号？<RouterLink to="/register">注册</RouterLink></p>
   </AuthShell>
 </template>
+
+<style scoped>
+.bootstrap-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: var(--space-4);
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.bootstrap-hint strong {
+  color: var(--accent);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.bootstrap-hint span {
+  color: var(--fg-muted);
+  font-size: 12.5px;
+}
+
+.first-run-alt {
+  font-weight: 500;
+}
+</style>

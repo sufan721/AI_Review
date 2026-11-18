@@ -2,6 +2,7 @@ package com.aireview.service.impl;
 
 import com.aireview.common.BusinessException;
 import com.aireview.common.ResultCode;
+import com.aireview.dto.GeneralSetting;
 import com.aireview.dto.UpdateProfileRequest;
 import com.aireview.dto.UpdateUserSettingRequest;
 import com.aireview.dto.UserProfileVO;
@@ -10,9 +11,11 @@ import com.aireview.entity.User;
 import com.aireview.entity.UserSetting;
 import com.aireview.mapper.UserMapper;
 import com.aireview.mapper.UserSettingMapper;
+import com.aireview.service.InstanceSettingService;
 import com.aireview.service.UserProfileService;
 import com.aireview.util.UserContext;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -21,6 +24,7 @@ import org.springframework.stereotype.Service;
 /**
  * 用户资料与设置服务实现。
  * 复用现有 UserMapper 的角色查询；设置走 user_setting 表。
+ * 资料编辑受实例开关 forbidChangeUsername / forbidChangeNickname 约束。
  */
 @Service
 public class UserProfileServiceImpl implements UserProfileService {
@@ -30,10 +34,13 @@ public class UserProfileServiceImpl implements UserProfileService {
 
     private final UserMapper userMapper;
     private final UserSettingMapper userSettingMapper;
+    private final InstanceSettingService instanceSettingService;
 
-    public UserProfileServiceImpl(UserMapper userMapper, UserSettingMapper userSettingMapper) {
+    public UserProfileServiceImpl(UserMapper userMapper, UserSettingMapper userSettingMapper,
+        InstanceSettingService instanceSettingService) {
         this.userMapper = userMapper;
         this.userSettingMapper = userSettingMapper;
+        this.instanceSettingService = instanceSettingService;
     }
 
     @Override
@@ -50,20 +57,58 @@ public class UserProfileServiceImpl implements UserProfileService {
             throw new BusinessException(ResultCode.NOT_FOUND);
         }
 
+        GeneralSetting general = instanceSettingService.getGeneral();
+
+        // 用户名变更：受 forbidChangeUsername 约束，需查重并踢旧会话
+        if (request.username() != null) {
+            if (general.forbidChangeUsername()) {
+                throw new BusinessException(ResultCode.FORBIDDEN, "管理员已禁止修改用户名");
+            }
+            String trimmed = request.username().trim();
+            if (!trimmed.equals(user.getUsername())) {
+                Long dup = userMapper.selectCount(Wrappers.<User>lambdaQuery()
+                    .eq(User::getUsername, trimmed)
+                    .ne(User::getId, userId));
+                if (dup != null && dup > 0) {
+                    throw new BusinessException(ResultCode.USERNAME_TAKEN.code(), "用户名已被占用");
+                }
+                User rename = new User();
+                rename.setId(userId);
+                rename.setUsername(trimmed);
+                userMapper.updateById(rename);
+                // 用户名变更后踢旧会话，强制重新登录
+                userMapper.bumpTokenVersion(userId);
+                user.setUsername(trimmed);
+            }
+        }
+
+        // 昵称 / 描述 / 头像：昵称受 forbidChangeNickname 约束
         User update = new User();
         update.setId(userId);
+        boolean dirty = false;
         if (request.displayName() != null) {
+            if (general.forbidChangeNickname()) {
+                throw new BusinessException(ResultCode.FORBIDDEN, "管理员已禁止修改昵称");
+            }
             update.setNickname(request.displayName().trim());
+            user.setNickname(request.displayName().trim());
+            dirty = true;
         }
         if (request.description() != null) {
             update.setDescription(request.description().trim());
+            user.setDescription(request.description().trim());
+            dirty = true;
         }
         if (request.avatarUrl() != null) {
             update.setAvatarUrl(request.avatarUrl().trim());
+            user.setAvatarUrl(request.avatarUrl().trim());
+            dirty = true;
         }
-        userMapper.updateById(update);
+        if (dirty) {
+            userMapper.updateById(update);
+        }
 
-        return toProfile(userMapper.selectById(userId));
+        return toProfile(user);
     }
 
     @Override

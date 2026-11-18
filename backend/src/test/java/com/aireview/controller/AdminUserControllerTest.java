@@ -77,13 +77,19 @@ class AdminUserControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/admin/users").header("Authorization", "Bearer " + userToken))
             .andExpect(status().isForbidden());
 
-        // 授权 bob 为第二个 admin 后，root 可撤销
+        // 授权 bob 为第二个 admin 后，root 仍不能给自己降权（自我保护）
         long bobId = userId("bob");
         mockMvc.perform(post("/api/admin/users/" + bobId + "/roles/admin")
                 .header("Authorization", "Bearer " + adminToken))
             .andExpect(status().isOk());
         mockMvc.perform(delete("/api/admin/users/" + rootId + "/roles/admin")
                 .header("Authorization", "Bearer " + adminToken))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value("不能对自己降权，请由其他管理员操作"));
+
+        // 由另一个管理员 bob 操作则允许（角色实时查库，授权后旧 token 即可用）
+        mockMvc.perform(delete("/api/admin/users/" + rootId + "/roles/admin")
+                .header("Authorization", "Bearer " + userToken))
             .andExpect(status().isOk());
     }
 

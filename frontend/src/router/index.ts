@@ -12,6 +12,7 @@ import ForgotPasswordView from '../views/ForgotPasswordView.vue'
 import SsoCallbackView from '../views/SsoCallbackView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import SettingsView from '../views/SettingsView.vue'
+import SettingsLayout from '../components/layout/SettingsLayout.vue'
 import AdminView from '../views/AdminView.vue'
 import { useAuthStore } from '../stores/auth'
 
@@ -32,9 +33,17 @@ const router = createRouter({
         { path: 'knowledge-bases/new', name: 'knowledge-base-new', component: KnowledgeBaseEditView },
         { path: 'knowledge-bases/:id', name: 'knowledge-base-detail', component: KnowledgeBaseDetailView, props: true },
         { path: 'knowledge-bases/:id/edit', name: 'knowledge-base-edit', component: KnowledgeBaseEditView, props: true },
-        { path: 'profile', name: 'profile', component: ProfileView },
-        { path: 'settings', name: 'settings', component: SettingsView },
-        { path: 'admin', name: 'admin', component: AdminView },
+        // 设置与管理统一收在「头像 → 设置」入口下，个人设置与管理分区共用同一条侧栏
+        {
+          path: 'settings',
+          component: SettingsLayout,
+          redirect: { name: 'profile' },
+          children: [
+            { path: 'profile', name: 'profile', component: ProfileView },
+            { path: 'preferences', name: 'settings', component: SettingsView },
+            { path: 'admin', name: 'admin', component: AdminView },
+          ],
+        },
       ],
     },
     { path: '/login', name: 'login', component: LoginView },

@@ -45,7 +45,8 @@ public class PublicAccessRegistry {
     /** 仅 GET 放行的引导接口：登录页/前端匿名读取实例 profile，避免把敏感设置暴露给匿名。 */
     private static final List<String> BOOTSTRAP_GET_ONLY = List.of(
         "/api/instance/settings/general",
-        "/api/instance/settings/access"
+        "/api/instance/settings/access",
+        "/api/instance/bootstrap"
     );
 
     /**
