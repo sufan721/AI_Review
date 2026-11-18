@@ -7,7 +7,10 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     ports: ["${MYSQL_PORT:-3307}:3306"]
-    volumes: ["mysql-data:/var/lib/mysql"]
+    volumes:
+      - "mysql-data:/var/lib/mysql"
+      # 首次初始化时自动执行建表脚本（幂等，CREATE TABLE IF NOT EXISTS）
+      - "../docs/sql/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
       interval: 10s
