@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Backend (Maven 通用)" type="ShConfigurationType">
+    <option name="SCRIPT_TEXT" value="$env:DB_URL='jdbc:mysql://localhost:3307/memo?useUnicode=true&amp;characterEncoding=UTF-8&amp;serverTimezone=Asia/Shanghai'; $env:DB_USERNAME='memo'; $env:DB_PASSWORD='memo'; $env:REDIS_HOST='localhost'; $env:REDIS_PORT='6379'; $env:MILVUS_HOST='localhost'; $env:MILVUS_PORT='19530'; $env:AUTH_STORE='redis'; $env:FRONTEND_BASE_URL='http://localhost:5173'; .\mvnw.cmd spring-boot:run" />
+    <option name="SCRIPT_PATH" value="" />
+    <option name="SCRIPT_OPTIONS" value="" />
+    <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$/backend" />
+    <option name="INTERPRETER_PATH" value="powershell.exe" />
+    <option name="INTERPRETER_OPTIONS" value="" />
+    <option name="EXECUTE_IN_TERMINAL" value="false" />
+    <option name="EXECUTE_SCRIPT_FILE" value="false" />
+    <method v="2" />
+  </configuration>
+</component>

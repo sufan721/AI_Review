@@ -86,38 +86,37 @@ docs/                             # 文档、SQL 脚本
 
 ## 快速开始
 
-前置要求：Docker Desktop（Docker Compose v2）。使用 `dev.ps1` 在宿主机运行前后端时，还需要 JDK 17、Node.js 20+；全容器模式不需要在宿主机安装 JDK 或 Node.js。
+前置要求：Docker Desktop（Docker Compose v2）、JDK 17、Node.js 20+。
 
-### 一键启动（Windows，本地开发）
+### IDEA 启动（推荐）
 
-```powershell
-.\dev.ps1
-```
+用 IDEA 打开仓库根目录后，右上角运行配置下拉框里可直接选择以下配置（已内置在 `.idea/runConfigurations/`）：
 
-该脚本首次运行时生成 `deploy/.env`，然后用 Docker 启动 MySQL / Redis / etcd / MinIO / Milvus、导入数据库表结构，并在宿主机新窗口运行后端和前端。后端通过宿主机映射端口连接依赖（MySQL `localhost:3307`、Redis `localhost:6379`、Milvus `localhost:19530`）。
-启动后：后端 http://localhost:8080 ，前端 http://localhost:5173 ，SSO 模拟 IdP http://localhost:8080/api/auth/sso/mock 。
+| 运行配置 | 作用 |
+| --- | --- |
+| **Start All (前后端一键启动)** | 依次启动基础设施 + 后端 + 前端（推荐） |
+| Infra (Docker 基础设施) | 只启动 MySQL / Redis / etcd / MinIO / Milvus |
+| Backend (Maven 通用) | 只启动后端（8080），调用 `mvnw.cmd spring-boot:run` |
+| Backend (Spring Boot) | 只启动后端（8080），Spring Boot 配置类型，仅 IntelliJ IDEA Ultimate 可用 |
+| Frontend (Vite) | 只启动前端（5173），需要 IDE 的 Node.js 支持 |
 
-### 一键启动（Windows，全部运行在 Docker）
+> Infra 与 Backend (Maven 通用) 都是 Shell 运行配置，直接调用外部命令，不依赖 IDE 的 Docker 连接或 Java 支持：Infra 执行 `docker compose ... up -d --wait`，无需在 `Settings → Build, Execution, Deployment → Docker` 里预先添加 Docker 连接；Backend (Maven 通用) 在 PyCharm / GoLand 里也能用。
+> 只有 IntelliJ IDEA Ultimate 支持 Spring Boot 配置类型（带 Spring 面板、热重启、断点调试）；其他 IDE 用 Backend (Maven 通用)，能起服务但没有这些面板。GoLand 没有 Node.js 支持，前端需在终端执行 `npm run dev`。
 
-```powershell
-.\start-docker.ps1
-```
+**首次导入后的准备（只需一次）：**
 
-首次运行会从 `deploy/.env.example` 生成 `deploy/.env`（已存在时不会覆盖），启动 MySQL / Redis / etcd / MinIO / Milvus 并等待 MySQL、Redis 健康检查通过（etcd、MinIO、Milvus 仅等待容器启动），导入 `docs/sql/schema.sql` 后，再构建并启动后端与前端容器。容器中的后端使用 Compose 服务名连接 MySQL `mysql:3306`、Redis `redis:6379` 和 Milvus `milvus:19530`；不要将其改为宿主机映射地址。默认后端地址为 http://localhost:8080 ，前端地址为 http://localhost:8088 。可编辑 `deploy/.env` 自定义端口及服务配置；脚本会将默认前端地址传给后端作为 SSO 回跳地址。
+1. **把后端的 Maven 工程导入进来**：右键 `backend/pom.xml` → `Add as Maven Project`（根目录的 `.idea` 里没有 Maven 工程记录，不导入的话模块上没有任何依赖库，Spring 相关的类全部标红、启动必然失败）。首次同步会解析依赖，之后都走 `~/.m2` 缓存。
+2. 确认已安装 JDK 17，并在 `File → Project Structure → Project` 里把 SDK 设为 JDK 17（`backend/pom.xml` 里 `<java.version>` 是 17）。
+3. 确认 Docker Desktop 已启动（一键启动会自动拉起 MySQL/Redis/Milvus 等容器，并利用 MySQL 的 initdb 机制自动建表，无需手动执行建表脚本）。
+4. 前端依赖：若 `frontend/node_modules` 不存在，先在 `frontend` 目录执行 `npm install`。
 
-查看后端日志：
+之后日常开发直接点 **Start All (前后端一键启动)** 即可。启动完成后访问：
 
-```powershell
-docker compose -f deploy/docker-compose.yml --env-file deploy/.env logs -f backend
-```
+- 前端：http://localhost:5173
+- 后端：http://localhost:8080
+- SSO 模拟 IdP：http://localhost:8080/api/auth/sso/mock
 
-停止容器但保留数据库等数据卷：
-
-```powershell
-docker compose -f deploy/docker-compose.yml --env-file deploy/.env down
-```
-
-不要添加 `-v`，除非确实要删除持久化数据。
+> 说明：后端运行配置已内置 DB_URL（`localhost:3307`，对应 Docker 映射端口）、Redis、Milvus 等环境变量，无需手动 export。若只想重启前后端、不重启动基础设施，分别单独运行 Backend 与 Frontend (Vite) 即可。
 
 ### 手动启动（宿主机运行前后端）
 
@@ -152,6 +151,22 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env exec -T mysql
 docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build backend frontend
 ```
 
+容器中的后端使用 Compose 服务名连接 MySQL `mysql:3306`、Redis `redis:6379`、Milvus `milvus:19530`，不要改成宿主机映射地址。默认后端 http://localhost:8080 、前端 http://localhost:8088 ，可在 `deploy/.env` 自定义端口。
+
+查看后端日志：
+
+```powershell
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env logs -f backend
+```
+
+停止容器但保留数据库等数据卷：
+
+```powershell
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env down
+```
+
+不要添加 `-v`，除非确实要删除持久化数据。
+
 ## 更多文档
 
 - [architecture.md](./architecture.md) — 项目架构设计说明
@@ -164,7 +179,7 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 
 已交付：
 
-- 基础框架：统一 API 响应与异常处理、健康检查、MySQL / Redis / Milvus（含 etcd、MinIO）本地编排与一键启动脚本。
+- 基础框架：统一 API 响应与异常处理、健康检查、MySQL / Redis / Milvus（含 etcd、MinIO）本地编排与 IDEA 一键启动配置。
 - 认证：图形验证码、密码登录（失败锁定 + 防枚举）、JWT 会话（jti + 刷新令牌轮换 + 登出黑名单）、
   短信/邮件验证码登录（验证码打印到服务端终端）、找回密码、OIDC 统一身份认证（轻量对接 + 模拟 IdP）、
   RBAC 角色（`ROLE_USER` / `ROLE_ADMIN`）、登录审计日志，以及对应的前端页面与登录态路由守卫。

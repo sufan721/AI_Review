@@ -1,0 +1,23 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Backend (Spring Boot)" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="AI_Review" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.aireview.AiReviewApplication" />
+    <option name="ALTERNATIVE_JRE_PATH" />
+    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="false" />
+    <envs>
+      <env name="DB_URL" value="jdbc:mysql://localhost:3307/memo?useUnicode=true&amp;characterEncoding=UTF-8&amp;serverTimezone=Asia/Shanghai" />
+      <env name="DB_USERNAME" value="memo" />
+      <env name="DB_PASSWORD" value="memo" />
+      <env name="REDIS_HOST" value="localhost" />
+      <env name="REDIS_PORT" value="6379" />
+      <env name="MILVUS_HOST" value="localhost" />
+      <env name="MILVUS_PORT" value="19530" />
+      <env name="SERVER_PORT" value="8080" />
+      <env name="AUTH_STORE" value="redis" />
+      <env name="FRONTEND_BASE_URL" value="http://localhost:5173" />
+    </envs>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
