@@ -3,11 +3,9 @@ import { defineStore } from 'pinia'
 import { authApi } from '../api/auth'
 import { getRefreshToken, getToken, setRefreshToken, setToken } from '../api/request'
 import type {
-  EmailLoginPayload,
   LoginPayload,
   LoginResponse,
   RegisterPayload,
-  SmsLoginPayload,
   User,
 } from '../types/auth'
 
@@ -27,14 +25,6 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function register(payload: RegisterPayload): Promise<void> {
     persist(await authApi.register(payload))
-  }
-
-  async function smsLogin(payload: SmsLoginPayload): Promise<void> {
-    persist(await authApi.smsLogin(payload))
-  }
-
-  async function emailLogin(payload: EmailLoginPayload): Promise<void> {
-    persist(await authApi.emailLogin(payload))
   }
 
   /** 用刷新令牌换新令牌；无刷新令牌时抛错，由调用方处理。 */
@@ -79,5 +69,5 @@ export const useAuthStore = defineStore('auth', () => {
     clear()
   }
 
-  return { user, isAuthenticated, login, register, smsLogin, emailLogin, refresh, restoreSession, logout }
+  return { user, isAuthenticated, login, register, refresh, restoreSession, logout }
 })
