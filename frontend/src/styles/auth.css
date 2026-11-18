@@ -117,7 +117,7 @@
   position: absolute;
   bottom: 0;
   transform-origin: center bottom;
-  transition: transform 0.7s ease-in-out;
+  transition: transform 0.7s ease-in-out, height 0.7s ease-in-out;
 }
 
 .auth-pillar.purple {
@@ -147,11 +147,11 @@
 .auth-eyes {
   position: absolute;
   display: flex;
-  transition: transform 0.7s ease-in-out;
+  transition: left 0.7s ease-in-out, top 0.7s ease-in-out;
 }
 
 .auth-eyes.dot-eyes {
-  transition: transform 0.2s ease-out;
+  transition: left 0.2s ease-out, top 0.2s ease-out;
 }
 
 .auth-eye {
@@ -176,7 +176,7 @@
   height: 4px;
   border-radius: 999px;
   background: var(--brand-ink);
-  transition: transform 0.2s ease-out;
+  transition: left 0.2s ease-out, top 0.2s ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

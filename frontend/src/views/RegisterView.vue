@@ -10,6 +10,7 @@ const router = useRouter()
 const username = ref('')
 const password = ref('')
 const showPassword = ref(false)
+const isTyping = ref(false)
 const error = ref('')
 const submitting = ref(false)
 
@@ -32,7 +33,13 @@ async function submit() {
 </script>
 
 <template>
-  <AuthShell title="创建账号" subtitle="注册后即可开始记录你的笔记">
+  <AuthShell
+    title="创建账号"
+    subtitle="注册后即可开始记录你的笔记"
+    :show-password="showPassword"
+    :password-length="password.length"
+    :is-typing="isTyping"
+  >
     <form class="auth-form" @submit.prevent="submit">
       <div class="auth-field">
         <label class="auth-label" for="register-username">用户名</label>
@@ -47,6 +54,8 @@ async function submit() {
           spellcheck="false"
           placeholder="3-32 位字母、数字或下划线"
           :readonly="submitting"
+          @focus="isTyping = true"
+          @blur="isTyping = false"
           required
         />
       </div>

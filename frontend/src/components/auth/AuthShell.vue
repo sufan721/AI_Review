@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import '../../styles/auth.css'
 
-defineProps<{
-  title: string
-  subtitle?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    title: string
+    subtitle?: string
+    showPassword?: boolean
+    passwordLength?: number
+    isTyping?: boolean
+  }>(),
+  { showPassword: false, passwordLength: 0, isTyping: false },
+)
 
 const pointer = ref<{ x: number; y: number } | null>(null)
 
@@ -13,11 +19,6 @@ const purpleBody = ref<HTMLElement | null>(null)
 const darkBody = ref<HTMLElement | null>(null)
 const orangeBody = ref<HTMLElement | null>(null)
 const yellowBody = ref<HTMLElement | null>(null)
-
-const purpleFace = ref<HTMLElement | null>(null)
-const darkFace = ref<HTMLElement | null>(null)
-const orangeFace = ref<HTMLElement | null>(null)
-const yellowFace = ref<HTMLElement | null>(null)
 
 function onPointerMove(event: MouseEvent) {
   pointer.value = { x: event.clientX, y: event.clientY }
@@ -53,6 +54,50 @@ function lookOffset(el: HTMLElement | null, max: number) {
   return { x: Math.cos(angle) * distance, y: Math.sin(angle) * distance }
 }
 
+type Point = { x: number; y: number }
+
+// 显示密码（且已输入）：所有角色正身、把脸和视线挪向左上，紫色还会时不时偷瞄
+const isRevealing = computed(() => props.showPassword && props.passwordLength > 0)
+// 已输入但隐藏密码：紫色长高歪头躲起来
+const isHiding = computed(() => !props.showPassword && props.passwordLength > 0)
+
+// 用户开始输入时，紫黑两个角色先互相看一眼（800ms）
+const lookingAtEachOther = ref(false)
+let lookTimer: ReturnType<typeof setTimeout> | undefined
+watch(
+  () => props.isTyping,
+  (typing) => {
+    clearTimeout(lookTimer)
+    lookingAtEachOther.value = typing
+    if (typing) {
+      lookTimer = setTimeout(() => {
+        lookingAtEachOther.value = false
+      }, 800)
+    }
+  },
+)
+
+// 显示密码时，紫色角色每隔 2~5 秒偷瞄一眼（持续 800ms）
+const purplePeeking = ref(false)
+let peekTimer: ReturnType<typeof setTimeout> | undefined
+let peekEndTimer: ReturnType<typeof setTimeout> | undefined
+function schedulePeek() {
+  peekTimer = setTimeout(() => {
+    purplePeeking.value = true
+    peekEndTimer = setTimeout(() => {
+      purplePeeking.value = false
+      if (isRevealing.value) schedulePeek()
+    }, 800)
+  }, 2000 + Math.random() * 3000)
+}
+watch(isRevealing, (active) => {
+  clearTimeout(peekTimer)
+  clearTimeout(peekEndTimer)
+  purplePeeking.value = false
+  if (active) schedulePeek()
+})
+
+// 眨眼
 let purpleBlinkTimer: ReturnType<typeof setTimeout> | undefined
 let darkBlinkTimer: ReturnType<typeof setTimeout> | undefined
 const purpleBlink = ref(false)
@@ -82,7 +127,8 @@ function eyeStyle(size: number, blinking: boolean) {
   }
 }
 
-function pupilStyle(el: HTMLElement | null, max: number) {
+function pupilStyle(el: HTMLElement | null, max: number, forced?: Point) {
+  if (forced) return { transform: `translate(${forced.x}px, ${forced.y}px)` }
   const { x, y } = lookOffset(el, max)
   return { transform: `translate(${x}px, ${y}px)` }
 }
@@ -96,48 +142,116 @@ const orangePupilB = ref<HTMLElement | null>(null)
 const yellowPupilA = ref<HTMLElement | null>(null)
 const yellowPupilB = ref<HTMLElement | null>(null)
 
-const purplePupilAStyle = computed(() => pupilStyle(purplePupilA.value, 5))
-const purplePupilBStyle = computed(() => pupilStyle(purplePupilB.value, 5))
-const darkPupilAStyle = computed(() => pupilStyle(darkPupilA.value, 4))
-const darkPupilBStyle = computed(() => pupilStyle(darkPupilB.value, 4))
-const orangePupilAStyle = computed(() => pupilStyle(orangePupilA.value, 5))
-const orangePupilBStyle = computed(() => pupilStyle(orangePupilB.value, 5))
-const yellowPupilAStyle = computed(() => pupilStyle(yellowPupilA.value, 5))
-const yellowPupilBStyle = computed(() => pupilStyle(yellowPupilB.value, 5))
+const purpleLook = computed<Point | undefined>(() => {
+  if (isRevealing.value) return purplePeeking.value ? { x: 4, y: 5 } : { x: -4, y: -4 }
+  if (lookingAtEachOther.value) return { x: 3, y: 4 }
+  return undefined
+})
+const darkLook = computed<Point | undefined>(() => {
+  if (isRevealing.value) return { x: -4, y: -4 }
+  if (lookingAtEachOther.value) return { x: 0, y: -4 }
+  return undefined
+})
+const orangeLook = computed<Point | undefined>(() =>
+  isRevealing.value ? { x: -5, y: -4 } : undefined,
+)
+const yellowLook = computed<Point | undefined>(() =>
+  isRevealing.value ? { x: -5, y: -4 } : undefined,
+)
+
+const purplePupilAStyle = computed(() => pupilStyle(purplePupilA.value, 5, purpleLook.value))
+const purplePupilBStyle = computed(() => pupilStyle(purplePupilB.value, 5, purpleLook.value))
+const darkPupilAStyle = computed(() => pupilStyle(darkPupilA.value, 4, darkLook.value))
+const darkPupilBStyle = computed(() => pupilStyle(darkPupilB.value, 4, darkLook.value))
+const orangePupilAStyle = computed(() => pupilStyle(orangePupilA.value, 5, orangeLook.value))
+const orangePupilBStyle = computed(() => pupilStyle(orangePupilB.value, 5, orangeLook.value))
+const yellowPupilAStyle = computed(() => pupilStyle(yellowPupilA.value, 5, yellowLook.value))
+const yellowPupilBStyle = computed(() => pupilStyle(yellowPupilB.value, 5, yellowLook.value))
 
 const purpleMotion = computed(() => bodyMotion(purpleBody.value))
 const darkMotion = computed(() => bodyMotion(darkBody.value))
 const orangeMotion = computed(() => bodyMotion(orangeBody.value))
 const yellowMotion = computed(() => bodyMotion(yellowBody.value))
 
-const purpleBodyStyle = computed(() => ({
-  transform: `skewX(${purpleMotion.value.bodySkew}deg)`,
-}))
-const darkBodyStyle = computed(() => ({
-  transform: `skewX(${darkMotion.value.bodySkew}deg)`,
-}))
+const purpleBodyStyle = computed(() => {
+  if (isRevealing.value) return { transform: 'skewX(0deg)', height: '400px' }
+  if (props.isTyping || isHiding.value) {
+    return {
+      transform: `skewX(${purpleMotion.value.bodySkew - 12}deg) translateX(40px)`,
+      height: '440px',
+    }
+  }
+  return { transform: `skewX(${purpleMotion.value.bodySkew}deg)`, height: '400px' }
+})
+const darkBodyStyle = computed(() => {
+  if (isRevealing.value) return { transform: 'skewX(0deg)' }
+  if (lookingAtEachOther.value) {
+    return { transform: `skewX(${darkMotion.value.bodySkew * 1.5 + 10}deg) translateX(20px)` }
+  }
+  if (props.isTyping) return { transform: `skewX(${darkMotion.value.bodySkew * 1.5}deg)` }
+  return { transform: `skewX(${darkMotion.value.bodySkew}deg)` }
+})
 const orangeBodyStyle = computed(() => ({
-  transform: `skewX(${orangeMotion.value.bodySkew}deg)`,
+  transform: isRevealing.value ? 'skewX(0deg)' : `skewX(${orangeMotion.value.bodySkew}deg)`,
 }))
 const yellowBodyStyle = computed(() => ({
-  transform: `skewX(${yellowMotion.value.bodySkew}deg)`,
+  transform: isRevealing.value ? 'skewX(0deg)' : `skewX(${yellowMotion.value.bodySkew}deg)`,
 }))
 
-const purpleFaceStyle = computed(() => ({
-  transform: `translate(${purpleMotion.value.faceX}px, ${purpleMotion.value.faceY}px)`,
-}))
-const darkFaceStyle = computed(() => ({
-  transform: `translate(${darkMotion.value.faceX}px, ${darkMotion.value.faceY}px)`,
-}))
-const orangeFaceStyle = computed(() => ({
-  transform: `translate(${orangeMotion.value.faceX}px, ${orangeMotion.value.faceY}px)`,
-}))
-const yellowFaceStyle = computed(() => ({
-  transform: `translate(${yellowMotion.value.faceX}px, ${yellowMotion.value.faceY}px)`,
-}))
-const yellowMouthStyle = computed(() => ({
-  transform: `translate(${yellowMotion.value.faceX}px, ${yellowMotion.value.faceY}px)`,
-}))
+// 五官位置：常态跟随鼠标；对视 / 显示密码时切到固定位置
+const FACE_BASE = {
+  purple: { left: 45, top: 40 },
+  dark: { left: 26, top: 32 },
+  orange: { left: 82, top: 90 },
+  yellow: { left: 52, top: 40 },
+  mouth: { left: 40, top: 88 },
+}
+const FACE_REVEAL = {
+  purple: { left: 20, top: 35 },
+  dark: { left: 10, top: 28 },
+  orange: { left: 50, top: 85 },
+  yellow: { left: 20, top: 35 },
+  mouth: { left: 10, top: 88 },
+}
+const FACE_LOOK = {
+  purple: { left: 55, top: 65 },
+  dark: { left: 32, top: 12 },
+}
+
+function faceStyle(
+  motion: { faceX: number; faceY: number },
+  base: { left: number; top: number },
+  reveal: { left: number; top: number },
+  look?: { left: number; top: number },
+) {
+  let left = base.left + motion.faceX
+  let top = base.top + motion.faceY
+  if (look && lookingAtEachOther.value) {
+    left = look.left
+    top = look.top
+  }
+  if (isRevealing.value) {
+    left = reveal.left
+    top = reveal.top
+  }
+  return { left: `${left}px`, top: `${top}px` }
+}
+
+const purpleFaceStyle = computed(() =>
+  faceStyle(purpleMotion.value, FACE_BASE.purple, FACE_REVEAL.purple, FACE_LOOK.purple),
+)
+const darkFaceStyle = computed(() =>
+  faceStyle(darkMotion.value, FACE_BASE.dark, FACE_REVEAL.dark, FACE_LOOK.dark),
+)
+const orangeFaceStyle = computed(() =>
+  faceStyle(orangeMotion.value, FACE_BASE.orange, FACE_REVEAL.orange),
+)
+const yellowFaceStyle = computed(() =>
+  faceStyle(yellowMotion.value, FACE_BASE.yellow, FACE_REVEAL.yellow),
+)
+const yellowMouthStyle = computed(() =>
+  faceStyle(yellowMotion.value, FACE_BASE.mouth, FACE_REVEAL.mouth),
+)
 
 onMounted(() => {
   window.addEventListener('mousemove', onPointerMove)
@@ -148,6 +262,9 @@ onUnmounted(() => {
   window.removeEventListener('mousemove', onPointerMove)
   clearTimeout(purpleBlinkTimer)
   clearTimeout(darkBlinkTimer)
+  clearTimeout(lookTimer)
+  clearTimeout(peekTimer)
+  clearTimeout(peekEndTimer)
 })
 </script>
 
