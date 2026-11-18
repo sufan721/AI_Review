@@ -25,10 +25,19 @@ public class JwtUtil {
     }
 
     public String generateToken(Long userId) {
+        return generateToken(userId, 0);
+    }
+
+    /**
+     * 生成带会话版本号的 token。
+     * 改密码/管理员重置密码时 token_version+1，旧 token 因 tv 不一致而失效。
+     */
+    public String generateToken(Long userId, int tokenVersion) {
         Date issuedAt = new Date();
         return Jwts.builder()
             .id(UUID.randomUUID().toString())
             .subject(String.valueOf(userId))
+            .claim("tv", tokenVersion)
             .issuedAt(issuedAt)
             .expiration(new Date(issuedAt.getTime() + Duration.ofSeconds(accessTtlSeconds).toMillis()))
             .signWith(key)
@@ -48,5 +57,17 @@ public class JwtUtil {
         } catch (JwtException | IllegalArgumentException exception) {
             return null;
         }
+    }
+
+    /** 读取 claims 中的会话版本号；缺失视为 0（兼容旧 token）。 */
+    public int parseTokenVersion(Claims claims) {
+        if (claims == null) {
+            return 0;
+        }
+        Object value = claims.get("tv");
+        if (value instanceof Number n) {
+            return n.intValue();
+        }
+        return 0;
     }
 }

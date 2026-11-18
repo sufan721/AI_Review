@@ -9,6 +9,7 @@ import com.aireview.entity.Document;
 import com.aireview.index.IndexingService;
 import com.aireview.index.ResourceType;
 import com.aireview.mapper.DocumentMapper;
+import com.aireview.security.OwnershipService;
 import com.aireview.service.DocumentService;
 import com.aireview.service.KnowledgeBaseService;
 import com.aireview.util.UserContext;
@@ -29,12 +30,14 @@ public class DocumentServiceImpl implements DocumentService {
     private final DocumentMapper documentMapper;
     private final IndexingService indexingService;
     private final KnowledgeBaseService knowledgeBaseService;
+    private final OwnershipService ownershipService;
 
     public DocumentServiceImpl(DocumentMapper documentMapper, IndexingService indexingService,
-        KnowledgeBaseService knowledgeBaseService) {
+        KnowledgeBaseService knowledgeBaseService, OwnershipService ownershipService) {
         this.documentMapper = documentMapper;
         this.indexingService = indexingService;
         this.knowledgeBaseService = knowledgeBaseService;
+        this.ownershipService = ownershipService;
     }
 
     @Override
@@ -99,14 +102,27 @@ public class DocumentServiceImpl implements DocumentService {
         }
     }
 
+    /**
+     * 按 id 取文档，与 NoteServiceImpl.loadOwned 同款两层判定：
+     * 先按 (id, currentUser) 查；未命中且 admin 可越权按 id 取，取不到 404；
+     * 非 owner 非 admin 一律 403，避免探测他人资源是否存在。
+     */
     private Document loadOwned(Long id) {
+        Long currentUserId = UserContext.require();
         Document document = documentMapper.selectOne(Wrappers.<Document>lambdaQuery()
             .eq(Document::getId, id)
-            .eq(Document::getUserId, UserContext.require()));
-        if (document == null) {
-            throw new BusinessException(ResultCode.FORBIDDEN);
+            .eq(Document::getUserId, currentUserId));
+        if (document != null) {
+            return document;
         }
-        return document;
+        if (ownershipService.isAdmin(currentUserId)) {
+            Document any = documentMapper.selectById(id);
+            if (any == null) {
+                throw new BusinessException(ResultCode.NOT_FOUND);
+            }
+            return any;
+        }
+        throw new BusinessException(ResultCode.FORBIDDEN);
     }
 
     private DocumentSummaryVO toSummary(Document document) {

@@ -46,4 +46,42 @@ public interface UserMapper extends BaseMapper<User> {
 
     @Update("UPDATE `user` SET password_hash = #{hash}, fail_count = 0, lock_until = NULL WHERE id = #{userId}")
     int updatePassword(@Param("userId") Long userId, @Param("hash") String hash);
+
+    /** 改密码/重置密码时会话版本号 +1，使旧 JWT 失效。 */
+    @Update("UPDATE `user` SET password_hash = #{hash}, token_version = token_version + 1, "
+        + "fail_count = 0, lock_until = NULL WHERE id = #{userId}")
+    int updatePasswordAndBumpVersion(@Param("userId") Long userId, @Param("hash") String hash);
+
+    /** 仅自增会话版本号（管理员改角色/状态/重置密码等场景踢掉旧会话）。 */
+    @Update("UPDATE `user` SET token_version = token_version + 1 WHERE id = #{userId}")
+    int bumpTokenVersion(@Param("userId") Long userId);
+
+    /** 当前活跃（status=1）且持有 ROLE_ADMIN 的用户数，用于「最后一个 admin」保护。 */
+    @Select("""
+        SELECT COUNT(*)
+        FROM `user` u
+        JOIN sys_user_role ur ON u.id = ur.user_id
+        JOIN sys_role r ON ur.role_id = r.id
+        WHERE u.status = 1 AND r.role_code = 'ROLE_ADMIN'
+        """)
+    long countActiveAdmins();
+
+    /** 移除某用户的 ROLE_ADMIN（不删除用户）。 */
+    @Update("""
+        DELETE ur FROM sys_user_role ur
+        JOIN sys_role r ON ur.role_id = r.id
+        WHERE ur.user_id = #{userId} AND r.role_code = 'ROLE_ADMIN'
+        """)
+    int revokeAdminRole(@Param("userId") Long userId);
+
+    /** 给某用户授予 ROLE_ADMIN（INSERT IGNORE，幂等）。 */
+    @Insert("""
+        INSERT IGNORE INTO sys_user_role (user_id, role_id)
+        SELECT #{userId}, id FROM sys_role WHERE role_code = 'ROLE_ADMIN'
+        """)
+    int grantAdminRole(@Param("userId") Long userId);
+
+    /** 设置用户状态（1 正常 / 0 禁用）。 */
+    @Update("UPDATE `user` SET status = #{status} WHERE id = #{userId}")
+    int updateStatus(@Param("userId") Long userId, @Param("status") int status);
 }

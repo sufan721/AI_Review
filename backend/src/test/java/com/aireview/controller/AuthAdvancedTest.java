@@ -115,6 +115,8 @@ class AuthAdvancedTest extends AbstractIntegrationTest {
 
     @Test
     void adminEndpointRequiresAdminRole() throws Exception {
+        // 先注册一个首用户占位（首用户自动 ADMIN），确保 frank 是非首用户 → ROLE_USER
+        register("first_admin");
         String token = register("frank").path("accessToken").asText();
 
         mockMvc.perform(get("/api/admin/users").header("Authorization", "Bearer " + token))

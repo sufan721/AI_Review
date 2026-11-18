@@ -7,7 +7,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.aireview.security.PermissionService;
+import com.aireview.security.PublicAccessRegistry;
 import com.aireview.security.TokenService;
+import com.aireview.service.InstanceSettingService;
+import com.aireview.service.PersonalAccessTokenService;
 import com.aireview.util.JwtUtil;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -28,7 +31,11 @@ class GlobalExceptionHandlerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    /** WebConfig 会被 Web 切片加载，其 JwtInterceptor 依赖 JwtUtil/TokenService/PermissionService；本测试只校验异常映射。 */
+    /**
+     * WebConfig 会被 Web 切片加载，其 JwtInterceptor 依赖
+     * JwtUtil/TokenService/PermissionService/PublicAccessRegistry/
+     * InstanceSettingService/PersonalAccessTokenService；本测试只校验异常映射。
+     */
     @MockBean
     private JwtUtil jwtUtil;
 
@@ -37,6 +44,15 @@ class GlobalExceptionHandlerTest {
 
     @MockBean
     private PermissionService permissionService;
+
+    @MockBean
+    private PublicAccessRegistry publicAccessRegistry;
+
+    @MockBean
+    private InstanceSettingService instanceSettingService;
+
+    @MockBean
+    private PersonalAccessTokenService personalAccessTokenService;
 
     @Test
     void invalidInputUsesTheApiEnvelope() throws Exception {

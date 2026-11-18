@@ -30,7 +30,10 @@ class DocumentControllerTest extends AbstractIntegrationTest {
     @BeforeEach
     void resetData() throws Exception {
         jdbcTemplate.execute("TRUNCATE TABLE `document`");
+        jdbcTemplate.execute("TRUNCATE TABLE `sys_user_role`");
         jdbcTemplate.execute("TRUNCATE TABLE `user`");
+        // 占位首用户 → 自动 ADMIN，确保后续 alice/bob 是非首用户 → ROLE_USER
+        register("first_admin");
         aliceToken = register("alice");
         bobToken = register("bob");
     }

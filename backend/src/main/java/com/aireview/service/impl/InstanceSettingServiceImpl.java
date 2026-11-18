@@ -2,6 +2,8 @@ package com.aireview.service.impl;
 
 import com.aireview.common.BusinessException;
 import com.aireview.common.ResultCode;
+import com.aireview.dto.AccessSetting;
+import com.aireview.dto.GeneralSetting;
 import com.aireview.dto.InstanceSettingVO;
 import com.aireview.entity.InstanceSetting;
 import com.aireview.mapper.InstanceSettingMapper;
@@ -19,6 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class InstanceSettingServiceImpl implements InstanceSettingService {
+
+    /** 实例设置中两类业务 key（统一大写）。 */
+    public static final String NAME_GENERAL = "GENERAL";
+    public static final String NAME_ACCESS = "ACCESS";
 
     private final InstanceSettingMapper instanceSettingMapper;
 
@@ -67,6 +73,41 @@ public class InstanceSettingServiceImpl implements InstanceSettingService {
         }
         instanceSettingMapper.updateById(setting);
         return new InstanceSettingVO(key, value, setting.getDescription());
+    }
+
+    @Override
+    public GeneralSetting getGeneral() {
+        InstanceSetting setting = find(NAME_GENERAL);
+        return setting == null ? GeneralSetting.defaults() : GeneralSetting.fromJson(setting.getValue());
+    }
+
+    @Override
+    @Transactional
+    @RequireRole("ROLE_ADMIN")
+    public GeneralSetting upsertGeneral(GeneralSetting setting) {
+        String json = setting.toJson();
+        upsert(NAME_GENERAL, json, "注册/密码登录开关");
+        return setting;
+    }
+
+    @Override
+    public AccessSetting getAccess() {
+        InstanceSetting setting = find(NAME_ACCESS);
+        return setting == null ? AccessSetting.defaults() : AccessSetting.fromJson(setting.getValue());
+    }
+
+    @Override
+    @Transactional
+    @RequireRole("ROLE_ADMIN")
+    public AccessSetting upsertAccess(AccessSetting setting) {
+        String json = setting.toJson();
+        upsert(NAME_ACCESS, json, "实例访问模式 PUBLIC/PRIVATE");
+        return setting;
+    }
+
+    private InstanceSetting find(String name) {
+        return instanceSettingMapper.selectOne(
+            new LambdaQueryWrapper<InstanceSetting>().eq(InstanceSetting::getName, name));
     }
 
     private static String normalizeName(String name) {

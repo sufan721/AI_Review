@@ -31,6 +31,9 @@ public class User {
     /** 头像 URL（memos 语义）。 */
     private String avatarUrl;
 
+    /** 会话版本号：改密码/重置时 +1，JWT claims 带 tv 比对不一致即 401。 */
+    private Integer tokenVersion;
+
     /** 1 正常，0 禁用。 */
     private Integer status;
 
