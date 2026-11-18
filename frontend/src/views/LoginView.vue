@@ -11,6 +11,7 @@ const route = useRoute()
 const username = ref('')
 const password = ref('')
 const showPassword = ref(false)
+const isTyping = ref(false)
 const submitting = ref(false)
 const error = ref('')
 
@@ -32,7 +33,13 @@ async function submit() {
 </script>
 
 <template>
-  <AuthShell title="欢迎回来" subtitle="登录后继续管理你的笔记与知识库">
+  <AuthShell
+    title="欢迎回来"
+    subtitle="登录后继续管理你的笔记与知识库"
+    :show-password="showPassword"
+    :password-length="password.length"
+    :is-typing="isTyping"
+  >
     <form class="auth-form" @submit.prevent="submit">
       <div class="auth-field">
         <label class="auth-label" for="login-username">用户名</label>
@@ -47,6 +54,8 @@ async function submit() {
           spellcheck="false"
           placeholder="请输入用户名"
           :readonly="submitting"
+          @focus="isTyping = true"
+          @blur="isTyping = false"
           required
         />
       </div>
