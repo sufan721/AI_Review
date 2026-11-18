@@ -10,6 +10,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * 全局异常兜底：所有异常都以 {@link Result} 信封返回，Controller 内不写 try-catch 拼错误。
@@ -35,6 +36,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleBadRequest(Exception exception) {
         return ResponseEntity.badRequest()
             .body(Result.fail(ResultCode.BAD_REQUEST.code(), ResultCode.BAD_REQUEST.message()));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Result<Void>> handleNoResource(NoResourceFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body(Result.fail(ResultCode.NOT_FOUND.code(), ResultCode.NOT_FOUND.message()));
     }
 
     @ExceptionHandler(Exception.class)
