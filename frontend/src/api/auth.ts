@@ -16,4 +16,7 @@ export const authApi = {
   logout: () => post<void>('/api/auth/logout'),
   me: (silentUnauthorized = false) =>
     request<User>('/api/auth/me', undefined, silentUnauthorized ? { silentUnauthorized: true } : undefined),
+  /** 当前用户自助改密码：校验旧密码，成功后旧会话失效需重新登录。 */
+  changePassword: (oldPassword: string, newPassword: string) =>
+    post<void>('/api/auth/change-password', { oldPassword, newPassword }),
 }

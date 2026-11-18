@@ -8,6 +8,14 @@ package com.aireview.service;
  */
 public interface AdminUserService {
 
+    /**
+     * 管理员新建成员：用户名查重后创建账号并绑定 ROLE_USER，初始状态启用。
+     * 不受「禁用注册」实例开关限制（管理员主动创建），用户名冲突时拒绝。
+     *
+     * @return 新建用户的 ID
+     */
+    Long createUser(String username, String password);
+
     /** 授予 ROLE_ADMIN；幂等。 */
     void grantAdmin(Long userId);
 
@@ -28,4 +36,15 @@ public interface AdminUserService {
      * 删除前自增 token_version 以防外键残留会话误用。
      */
     void deleteUser(Long userId);
+
+    /**
+     * 管理员重置用户密码（不校验旧密码）；写入新哈希并自增 token_version，
+     * 该用户旧 JWT 立即失效，需用新密码重新登录。
+     */
+    void changePassword(Long userId, String newPassword);
+
+    /**
+     * 管理员修改用户登录用户名；查重后更新并自增 token_version 踢旧会话。
+     */
+    void changeUsername(Long userId, String newUsername);
 }

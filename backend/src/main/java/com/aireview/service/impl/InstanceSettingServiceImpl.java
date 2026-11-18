@@ -86,7 +86,7 @@ public class InstanceSettingServiceImpl implements InstanceSettingService {
     @RequireRole("ROLE_ADMIN")
     public GeneralSetting upsertGeneral(GeneralSetting setting) {
         String json = setting.toJson();
-        upsert(NAME_GENERAL, json, "注册/密码登录开关");
+        upsert(NAME_GENERAL, json, "注册/登录/资料编辑开关");
         return setting;
     }
 

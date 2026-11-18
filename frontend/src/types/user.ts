@@ -12,6 +12,7 @@ export type UserProfile = {
 }
 
 export type UpdateProfilePayload = {
+  username?: string | null
   displayName?: string | null
   description?: string | null
   avatarUrl?: string | null
