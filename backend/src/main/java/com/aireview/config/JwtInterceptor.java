@@ -93,7 +93,9 @@ public class JwtInterceptor implements HandlerInterceptor {
                     writeForbidden(response);
                     return false;
                 }
-                if (!authorized(patUserId, handlerMethod)) {
+                // 该方法只做注解声明的角色/权限校验，不含认证逻辑；统一在凭证解析后调用，
+                // 无凭证分支一律 401，不存在绕过
+                if (!checkRoleAndPermission(patUserId, handlerMethod)) {
                     writeForbidden(response);
                     return false;
                 }
@@ -122,7 +124,7 @@ public class JwtInterceptor implements HandlerInterceptor {
                 writeForbidden(response);
                 return false;
             }
-            if (!authorized(userId, handlerMethod)) {
+            if (!checkRoleAndPermission(userId, handlerMethod)) {
                 writeForbidden(response);
                 return false;
             }
@@ -140,7 +142,11 @@ public class JwtInterceptor implements HandlerInterceptor {
         return false;
     }
 
-    private boolean authorized(Long userId, HandlerMethod handlerMethod) {
+    /**
+     * 按 Handler 上的注解校验实例角色/权限。这里只做鉴权，不做身份认证：
+     * 认证已在上方由 JWT / PAT 解析完成，未认证请求在下方直接 401。
+     */
+    private boolean checkRoleAndPermission(Long userId, HandlerMethod handlerMethod) {
         RequireRole role = resolveAnnotation(handlerMethod, RequireRole.class);
         if (role != null && !permissionService.hasRole(userId, role.value())) {
             return false;
