@@ -88,7 +88,7 @@ onMounted(load)
     <p v-else-if="documents.length === 0" class="muted empty">还没有上传 Markdown 文件。</p>
     <div v-else class="workspace">
       <ul class="list">
-        <li v-for="document in documents" :key="document.id" :class="['item', { selected: selected?.id === document.id }]">
+        <li v-for="document in documents" :key="document.id" :class="['item card-hover', { selected: selected?.id === document.id }]">
           <button class="file" type="button" @click="openDocument(document)">
             <strong>{{ document.fileName }}</strong>
             <span>{{ formatSize(document.fileSize) }} · {{ document.indexStatus }}</span>
@@ -118,7 +118,6 @@ h1 { margin: 0; font-size: 22px; } h2 { margin: 0 0 12px; font-size: 18px; }
 .list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
 .item { display: flex; gap: 8px; align-items: stretch; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius); }
 .item.selected { border-color: var(--accent); background: var(--bg-soft); }
-.file { flex: 1; min-width: 0; border: 0; background: transparent; text-align: left; color: var(--fg); padding: 4px; }
 .file strong, .file span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file span { color: var(--fg-muted); font-size: 12px; margin-top: 2px; } .danger { color: var(--danger); padding: 4px 8px; }
 .file .fail-reason { color: var(--danger); }

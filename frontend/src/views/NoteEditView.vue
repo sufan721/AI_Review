@@ -127,11 +127,13 @@ async function save(): Promise<void> {
   color: var(--fg);
   font-size: 18px;
   font-weight: 600;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .title:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .head-actions {
@@ -174,17 +176,19 @@ async function save(): Promise<void> {
   border-radius: var(--radius);
   background: var(--bg);
   overflow-y: auto;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .editor {
   resize: vertical;
   font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
   line-height: 1.7;
+  outline: none;
 }
 
 .editor:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .muted {

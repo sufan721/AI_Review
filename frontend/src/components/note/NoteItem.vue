@@ -13,7 +13,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <li class="item">
+  <li class="item card-hover">
     <div class="main-wrap">
       <button class="main" type="button" @click="emit('open', note.id)">
         <span class="title">

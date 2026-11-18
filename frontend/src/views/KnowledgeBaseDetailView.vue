@@ -173,7 +173,7 @@ async function onRemoveMember(member: KnowledgeBaseMember): Promise<void> {
         </div>
         <p v-if="store.members.length === 0" class="muted empty">暂无成员。</p>
         <ul v-else class="members">
-          <li v-for="member in store.members" :key="member.userId" class="member">
+          <li v-for="member in store.members" :key="member.userId" class="member card-hover">
             <div class="member-info">
               <strong>{{ member.nickname ?? member.username ?? `用户 ${member.userId}` }}</strong>
               <span v-if="member.username && member.nickname" class="muted">{{ member.username }}</span>
@@ -214,7 +214,7 @@ async function onRemoveMember(member: KnowledgeBaseMember): Promise<void> {
               <h3>我的笔记</h3>
               <p v-if="noteCandidates.length === 0" class="muted">暂无笔记。</p>
               <ul v-else class="candidates">
-                <li v-for="note in noteCandidates" :key="note.id" class="candidate">
+                <li v-for="note in noteCandidates" :key="note.id" class="candidate card-hover">
                   <span class="candidate-name">{{ note.title === '' ? '无标题' : note.title }}</span>
                   <button
                     class="btn"
@@ -231,7 +231,7 @@ async function onRemoveMember(member: KnowledgeBaseMember): Promise<void> {
               <h3>我的文件</h3>
               <p v-if="documentCandidates.length === 0" class="muted">暂无文件。</p>
               <ul v-else class="candidates">
-                <li v-for="document in documentCandidates" :key="document.id" class="candidate">
+                <li v-for="document in documentCandidates" :key="document.id" class="candidate card-hover">
                   <span class="candidate-name">{{ document.fileName }}</span>
                   <button
                     class="btn"
@@ -375,6 +375,12 @@ h3 {
   color: var(--fg);
   font-family: inherit;
   font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.role-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 .picker {
   margin-bottom: 16px;

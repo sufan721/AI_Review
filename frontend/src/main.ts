@@ -5,6 +5,7 @@ import router from './router'
 import { setUnauthorizedHandler } from './api/request'
 import { useAuthStore } from './stores/auth'
 import './styles/theme.css'
+import './styles/ui.css'
 
 setUnauthorizedHandler(() => {
   useAuthStore().logout()

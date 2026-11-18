@@ -1,15 +1,65 @@
-/* 全局主题变量：颜色与字体统一在此定义，组件内不得硬编码色值 */
+/* 全局主题变量：颜色、字体、间距、圆角、阴影统一在此定义，组件内不得硬编码色值 */
 :root {
+  /* ===== 画布与表面 ===== */
   --bg: #ffffff;
-  --bg-soft: #f6f7f9;
-  --fg: #1f2328;
-  --fg-muted: #656d76;
-  --border: #d8dee4;
+  --bg-canvas: #f6f7f9;
+  --bg-soft: #f2f4f7;
+  --bg-sunken: #fafbfc;
+  --bg-hover: #f3f6fb;
+
+  /* ===== 文本 ===== */
+  --fg: #171a1f;
+  --fg-muted: #5d6a7a;
+  --fg-subtle: #8b95a5;
+
+  /* ===== 描边 ===== */
+  --border: #e4e8ef;
+  --border-strong: #d2d8e3;
+
+  /* ===== 语义色 ===== */
   --accent: #2f6feb;
+  --accent-hover: #2560d4;
   --accent-fg: #ffffff;
+  --accent-soft: #eef3fe;
   --danger: #d1242f;
+  --danger-soft: #fdf1f1;
+  --success: #12805c;
+  --success-soft: #ebf7f2;
+  --warning: #a06400;
+  --warning-soft: #fdf5e6;
+
+  /* ===== 圆角 ===== */
+  --radius-sm: 6px;
   --radius: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* ===== 间距（4px 基准网格） ===== */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ===== 阴影梯度 ===== */
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 4px 12px -2px rgba(16, 24, 40, 0.1), 0 2px 6px -2px rgba(16, 24, 40, 0.06);
+  --shadow-lg: 0 16px 32px -12px rgba(16, 24, 40, 0.18), 0 4px 10px -4px rgba(16, 24, 40, 0.08);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+
+  /* ===== 动效 ===== */
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur: 180ms;
+
   --font: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
 }
 
 * {
@@ -25,11 +75,18 @@ body {
   font-family: var(--font);
   font-size: 15px;
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 a {
   color: var(--accent);
   text-decoration: none;
+  transition: color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+}
+
+a:hover {
+  opacity: 0.85;
 }
 
 button {
@@ -38,55 +95,154 @@ button {
   cursor: pointer;
 }
 
-input {
+input,
+select,
+textarea {
   font-family: inherit;
   font-size: inherit;
 }
 
+/* 键盘可达性：仅在键盘导航时显示焦点环，鼠标点击不打扰 */
+:where(a, button, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 通用卡片：hover 轻微上浮 + 阴影（供列表项复用） */
+.card-hover {
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
+    transform var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+
+.card-hover:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+/* 路由切换淡入过渡 */
+.route-fade-enter-active,
+.route-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.route-fade-enter-from,
+.route-fade-leave-to {
+  opacity: 0;
+}
+
+/* ===== 表单字段 ===== */
 .field {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
+  font-size: 13px;
+  color: var(--fg-muted);
 }
 
-.field input {
+.field input,
+.field select,
+.field textarea {
   padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
   color: var(--fg);
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 
-.field input:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
+.field input:hover,
+.field select:hover,
+.field textarea:hover {
+  border-color: var(--border-strong);
 }
 
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+/* ===== 按钮基类：统一高度、过渡与按压反馈 ===== */
 .btn {
-  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
   color: var(--fg);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
   white-space: nowrap;
+  text-decoration: none;
+  transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease), filter var(--dur-fast) var(--ease);
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+  color: var(--fg);
+  opacity: 1;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .btn-primary {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--accent-fg);
+  box-shadow: var(--shadow-xs);
+}
+
+.btn-primary:hover:not(:disabled) {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+  color: var(--accent-fg);
+  box-shadow: 0 4px 12px -2px color-mix(in srgb, var(--accent) 35%, transparent);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: var(--shadow-xs);
 }
 
 .btn-primary:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
-.form-error {
-  margin: 0 0 16px;
-  padding: 8px 12px;
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
+/* 危险按钮 hover 变红 */
+.btn.danger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
   color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.form-error {
+  margin: 0 0 var(--space-4);
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 24%, transparent);
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 13.5px;
 }
