@@ -9,6 +9,8 @@ import com.aireview.security.RequirePermission;
 import com.aireview.security.RequireRole;
 import com.aireview.security.TokenService;
 import com.aireview.service.InstanceSettingService;
+import com.aireview.service.PersonalAccessTokenService;
+import com.aireview.service.impl.PersonalAccessTokenServiceImpl;
 import com.aireview.util.JwtUtil;
 import com.aireview.util.UserContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,16 +50,18 @@ public class JwtInterceptor implements HandlerInterceptor {
     private final PermissionService permissionService;
     private final PublicAccessRegistry publicAccessRegistry;
     private final InstanceSettingService instanceSettingService;
+    private final PersonalAccessTokenService patService;
 
     public JwtInterceptor(JwtUtil jwtUtil, ObjectMapper objectMapper, TokenService tokenService,
         PermissionService permissionService, PublicAccessRegistry publicAccessRegistry,
-        InstanceSettingService instanceSettingService) {
+        InstanceSettingService instanceSettingService, PersonalAccessTokenService patService) {
         this.jwtUtil = jwtUtil;
         this.objectMapper = objectMapper;
         this.tokenService = tokenService;
         this.permissionService = permissionService;
         this.publicAccessRegistry = publicAccessRegistry;
         this.instanceSettingService = instanceSettingService;
+        this.patService = patService;
     }
 
     @Override
@@ -72,10 +76,32 @@ public class JwtInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // 2) 已认证：解析 JWT → UserContext，再按注解校验角色/权限
+        // 2) 已认证：解析凭证（JWT 或 PAT）→ UserContext，再按注解校验角色/权限
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (header != null && header.startsWith(BEARER_PREFIX)) {
-            Claims claims = jwtUtil.parseClaims(header.substring(BEARER_PREFIX.length()));
+            String token = header.substring(BEARER_PREFIX.length());
+
+            // PAT 分支：token 以 memos_pat_ 开头，按 SHA-256 摘要比对 personal_access_token
+            if (token.startsWith(PersonalAccessTokenServiceImpl.TOKEN_PREFIX)) {
+                Long patUserId = patService.verify(token);
+                if (patUserId == null) {
+                    writeUnauthorized(response);
+                    return false;
+                }
+                UserContext.set(patUserId);
+                if (!(handler instanceof HandlerMethod handlerMethod)) {
+                    writeForbidden(response);
+                    return false;
+                }
+                if (!authorized(patUserId, handlerMethod)) {
+                    writeForbidden(response);
+                    return false;
+                }
+                return true;
+            }
+
+            // JWT 分支：解析 claims，校验黑名单
+            Claims claims = jwtUtil.parseClaims(token);
             Long userId = parseUserId(claims);
             if (userId == null) {
                 writeUnauthorized(response);

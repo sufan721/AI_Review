@@ -15,6 +15,7 @@ import com.aireview.security.PublicAccessRegistry;
 import com.aireview.security.RequireRole;
 import com.aireview.security.TokenService;
 import com.aireview.service.InstanceSettingService;
+import com.aireview.service.PersonalAccessTokenService;
 import com.aireview.util.JwtUtil;
 import com.aireview.util.UserContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,6 +36,7 @@ class JwtInterceptorTest {
     private PermissionService permissionService;
     private PublicAccessRegistry publicAccessRegistry;
     private InstanceSettingService instanceSettingService;
+    private PersonalAccessTokenService patService;
     private JwtInterceptor interceptor;
 
     @BeforeEach
@@ -44,11 +46,12 @@ class JwtInterceptorTest {
         permissionService = mock(PermissionService.class);
         publicAccessRegistry = mock(PublicAccessRegistry.class);
         instanceSettingService = mock(InstanceSettingService.class);
+        patService = mock(PersonalAccessTokenService.class);
         // 默认所有请求都不是引导接口、都不是公开资源；具体用例按需覆盖
         when(publicAccessRegistry.isBootstrap(any())).thenReturn(false);
         when(publicAccessRegistry.isPublicResource(any())).thenReturn(false);
         interceptor = new JwtInterceptor(jwtUtil, new ObjectMapper(), tokenService, permissionService,
-            publicAccessRegistry, instanceSettingService);
+            publicAccessRegistry, instanceSettingService, patService);
     }
 
     @AfterEach
@@ -135,6 +138,32 @@ class JwtInterceptorTest {
 
         assertThat(interceptor.preHandle(request, response, handler)).isTrue();
         assertThat(response.getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void patTokenAuthenticatesAndWritesUserContext() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(HttpMethod.GET.name(), "/api/notes");
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer memos_pat_abcdef");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        when(patService.verify("memos_pat_abcdef")).thenReturn(7L);
+        HandlerMethod handler = new HandlerMethod(new ProbeController(), ProbeController.class.getMethod("open"));
+
+        assertThat(interceptor.preHandle(request, response, handler)).isTrue();
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(UserContext.require()).isEqualTo(7L);
+        // PAT 分支不应触碰 JWT 解析
+        verify(jwtUtil, never()).parseClaims(anyString());
+    }
+
+    @Test
+    void invalidPatTokenIsRejected() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(HttpMethod.GET.name(), "/api/notes");
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer memos_pat_invalid");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        when(patService.verify("memos_pat_invalid")).thenReturn(null);
+
+        assertThat(interceptor.preHandle(request, response, new Object())).isFalse();
+        assertThat(response.getStatus()).isEqualTo(401);
     }
 
     @Test
