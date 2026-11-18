@@ -12,6 +12,7 @@ import com.aireview.entity.Note;
 import com.aireview.index.IndexingService;
 import com.aireview.index.ResourceType;
 import com.aireview.mapper.NoteMapper;
+import com.aireview.security.OwnershipService;
 import com.aireview.service.KnowledgeBaseService;
 import com.aireview.service.NoteService;
 import com.aireview.util.UserContext;
@@ -32,12 +33,14 @@ public class NoteServiceImpl implements NoteService {
     private final NoteMapper noteMapper;
     private final IndexingService indexingService;
     private final KnowledgeBaseService knowledgeBaseService;
+    private final OwnershipService ownershipService;
 
     public NoteServiceImpl(NoteMapper noteMapper, IndexingService indexingService,
-        KnowledgeBaseService knowledgeBaseService) {
+        KnowledgeBaseService knowledgeBaseService, OwnershipService ownershipService) {
         this.noteMapper = noteMapper;
         this.indexingService = indexingService;
         this.knowledgeBaseService = knowledgeBaseService;
+        this.ownershipService = ownershipService;
     }
 
     @Override
@@ -122,17 +125,30 @@ public class NoteServiceImpl implements NoteService {
     }
 
     /**
-     * 按 id 取笔记时一律带上 user_id 条件：查不到既可能是记录不存在，也可能是别人的资源，
-     * 统一返回 403 以免通过状态码探测他人资源是否存在。
+     * 按 id 取笔记：
+     * <ul>
+     *   <li>先按 (id, currentUser) 查，命中即 owner，直接返回；</li>
+     *   <li>未命中时，若当前用户是实例管理员，按 id 越权取一条，取不到返回 404；</li>
+     *   <li>非 owner 非 admin 一律 403，避免通过状态码探测他人资源是否存在。</li>
+     * </ul>
+     * 知识库内操作不经过本方法，继续走成员表语义。
      */
     private Note loadOwned(Long id) {
+        Long currentUserId = UserContext.require();
         Note note = noteMapper.selectOne(Wrappers.<Note>lambdaQuery()
             .eq(Note::getId, id)
-            .eq(Note::getUserId, UserContext.require()));
-        if (note == null) {
-            throw new BusinessException(ResultCode.FORBIDDEN);
+            .eq(Note::getUserId, currentUserId));
+        if (note != null) {
+            return note;
         }
-        return note;
+        if (ownershipService.isAdmin(currentUserId)) {
+            Note any = noteMapper.selectById(id);
+            if (any == null) {
+                throw new BusinessException(ResultCode.NOT_FOUND);
+            }
+            return any;
+        }
+        throw new BusinessException(ResultCode.FORBIDDEN);
     }
 
     private NoteVO mutate(Long id, Consumer<Note> mutation) {

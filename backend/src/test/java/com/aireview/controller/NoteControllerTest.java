@@ -39,7 +39,11 @@ class NoteControllerTest extends AbstractIntegrationTest {
     @BeforeEach
     void resetData() throws Exception {
         jdbcTemplate.execute("TRUNCATE TABLE `note`");
+        jdbcTemplate.execute("TRUNCATE TABLE `sys_user_role`");
         jdbcTemplate.execute("TRUNCATE TABLE `user`");
+        // 占位首用户 → 自动 ADMIN，确保后续 alice/bob 是非首用户 → ROLE_USER，
+        // 与 task 2「首用户自动 ADMIN」协同，保持「alice 访问 bob 资源 → 403」等用例语义
+        register("first_admin");
         aliceToken = register("alice");
         bobToken = register("bob");
     }
