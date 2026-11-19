@@ -1,25 +1,33 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { adminApi, identityProviderApi, instanceSettingApi } from '../api/admin'
 import { useAuthStore } from '../stores/auth'
+import { CRON_OPTIONS, usePersistenceStore } from '../stores/persistence'
+import { useAttachmentStorageStore } from '../stores/attachmentStorage'
+import type { BackupRecord, PersistenceSetting } from '../types/persistence'
+import type {
+  AttachmentItem,
+  AttachmentStorageSetting,
+} from '../types/attachmentStorage'
 import type {
   AdminUser,
   GeneralSetting,
   IdentityProvider,
   IdentityProviderPayload,
   InstanceSetting,
-  PersistenceConfig,
   RagConfig,
 } from '../types/admin'
 
-type Section = 'users' | 'policies' | 'rag' | 'persistence' | 'providers' | 'settings'
+type Section = 'users' | 'policies' | 'rag' | 'persistence' | 'attachments' | 'providers' | 'settings'
 type RoleChoice = 'ROLE_ADMIN' | 'ROLE_USER'
 
-const SECTION_IDS: Section[] = ['users', 'policies', 'rag', 'persistence', 'providers', 'settings']
+const SECTION_IDS: Section[] = ['users', 'policies', 'rag', 'persistence', 'attachments', 'providers', 'settings']
 
 const route = useRoute()
 const auth = useAuthStore()
+const persistence = usePersistenceStore()
+const attachmentStorage = useAttachmentStorageStore()
 
 // 分区由左侧全站侧边栏的链接驱动（/admin?section=xxx），页面内不再放第二层侧栏
 const section = computed<Section>(() => {
@@ -44,7 +52,8 @@ const sectionTitles: Record<Section, { title: string; sub: string }> = {
   users: { title: '成员管理', sub: '管理实例成员，调整角色、重置密码与用户名' },
   policies: { title: '访问与策略', sub: '控制该实例的注册、登录、资料编辑和日历默认行为' },
   rag: { title: 'RAG 系统', sub: '配置检索增强生成服务的 API 接入' },
-  persistence: { title: '数据持久化', sub: '配置数据存储路径与备份保留策略' },
+  persistence: { title: '数据持久化', sub: '管理数据快照的目录、周期、历史与恢复' },
+  attachments: { title: '附件存储', sub: '选择新附件的保存位置：本地文件系统或应用数据库' },
   providers: { title: '身份源', sub: '管理 OIDC / SSO 身份提供商' },
   settings: { title: '原始设置', sub: '实例设置键值表，同名 key 会被覆盖' },
 }
@@ -65,9 +74,12 @@ async function run(action: () => Promise<void>): Promise<void> {
 function loadSection(next: Section): void {
   error.value = ''
   notice.value = ''
+  if (next !== 'persistence') persistence.cancelPolling()
   if (next === 'users') void loadUsers()
   else if (next === 'policies') void loadGeneral()
-  else if (next === 'rag' || next === 'persistence') void loadConfigs()
+  else if (next === 'rag') void loadRag()
+  else if (next === 'persistence') void loadPersistencePanel()
+  else if (next === 'attachments') void loadAttachmentStoragePanel()
   else if (next === 'providers') void loadProviders()
   else void loadSettings()
 }
@@ -239,24 +251,15 @@ async function saveGeneral(): Promise<void> {
   })
 }
 
-// ---- RAG / 数据持久化配置 ----
+// ---- RAG 配置（仍走通用 KV，见 RAG_API）----
 const rag = ref<RagConfig>({ enabled: false, baseUrl: '', apiKey: '', model: '' })
-const persistence = ref<PersistenceConfig>({
-  enabled: true, storagePath: '', autoBackup: false, retentionDays: 30,
-})
 
-async function loadConfigs(): Promise<void> {
+async function loadRag(): Promise<void> {
   await run(async () => {
     const all = await instanceSettingApi.list()
     const ragSetting = all.find((item) => item.name === 'RAG_API')
     if (ragSetting?.value) {
       try { rag.value = { ...rag.value, ...JSON.parse(ragSetting.value) as Partial<RagConfig> } } catch { /* 忽略损坏的配置 */ }
-    }
-    const persistenceSetting = all.find((item) => item.name === 'PERSISTENCE')
-    if (persistenceSetting?.value) {
-      try {
-        persistence.value = { ...persistence.value, ...JSON.parse(persistenceSetting.value) as Partial<PersistenceConfig> }
-      } catch { /* 忽略损坏的配置 */ }
     }
   })
 }
@@ -270,13 +273,150 @@ async function saveRag(): Promise<void> {
   })
 }
 
-async function savePersistence(): Promise<void> {
+// ---- 数据快照 ----
+const settingDraft = ref<PersistenceSetting>({
+  enabled: true, storagePath: '', autoBackup: false, backupCron: '0 0 3 * * *', retentionDays: 30,
+})
+const restoreTarget = ref<BackupRecord | null>(null)
+const restoreConfirm = ref('')
+const restoreOpen = ref(false)
+
+async function loadPersistencePanel(): Promise<void> {
+  persistence.cancelPolling()
   await run(async () => {
-    await instanceSettingApi.upsert('PERSISTENCE', {
-      value: JSON.stringify(persistence.value), description: '数据持久化配置',
-    })
-    notice.value = '数据持久化配置已保存'
+    await persistence.loadAll()
+    if (persistence.setting !== null) settingDraft.value = { ...persistence.setting }
   })
+}
+
+async function savePersistenceSetting(): Promise<void> {
+  await run(async () => {
+    await persistence.saveSetting({ ...settingDraft.value })
+    if (persistence.setting !== null) settingDraft.value = { ...persistence.setting }
+    notice.value = '快照策略已保存'
+  })
+}
+
+const customCron = computed(() =>
+  !CRON_OPTIONS.some((option) => option.value === settingDraft.value.backupCron))
+
+async function doBackup(): Promise<void> {
+  await run(async () => {
+    await persistence.startBackup()
+    notice.value = '备份完成，已加入历史列表'
+  })
+}
+
+async function doVerify(id: number): Promise<void> {
+  await run(async () => {
+    const result = await persistence.verify(id)
+    notice.value = result.valid ? '归档校验通过' : `归档校验失败：${result.reason ?? ''}`
+  })
+}
+
+async function doRemove(record: BackupRecord): Promise<void> {
+  if (!window.confirm(`删除归档「${record.fileName}」？该操作不可撤销。`)) return
+  await run(async () => {
+    await persistence.remove(record.id)
+    notice.value = '归档已删除'
+  })
+}
+
+async function doDownload(record: BackupRecord): Promise<void> {
+  await run(async () => { await persistence.download(record.id, record.fileName) })
+}
+
+function openRestore(record: BackupRecord): void {
+  restoreTarget.value = record
+  restoreConfirm.value = ''
+  restoreOpen.value = true
+}
+
+async function doRestore(): Promise<void> {
+  if (restoreConfirm.value !== 'RESTORE' || restoreTarget.value === null) return
+  const id = restoreTarget.value.id
+  await run(async () => {
+    await persistence.startRestore(id)
+    restoreOpen.value = false
+    restoreTarget.value = null
+    notice.value = '恢复完成，向量索引已在后台重建'
+  })
+}
+
+function formatBytes(bytes: number): string {
+  if (!bytes) return '—'
+  return bytes < 1024 * 1024
+    ? `${(bytes / 1024).toFixed(1)} KB`
+    : `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+function formatTime(value: string | null): string {
+  if (!value) return '—'
+  const date = new Date(value.includes('T') ? value : value.replace(' ', 'T'))
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN')
+}
+
+// ---- 附件存储 ----
+const storageDraft = ref<AttachmentStorageSetting>({
+  mode: 'LOCAL_FS', localDir: './data/attachments', maxSizeMb: 20,
+})
+/** 保存前待确认的模式切换：null 表示当前保存不改变模式，无需弹窗。 */
+const pendingMode = ref<'LOCAL_FS' | 'DATABASE' | null>(null)
+const switchOpen = ref(false)
+const uploadBusy = ref(false)
+
+async function loadAttachmentStoragePanel(): Promise<void> {
+  await run(async () => {
+    await attachmentStorage.loadAll()
+    if (attachmentStorage.setting !== null) storageDraft.value = { ...attachmentStorage.setting }
+  })
+}
+
+/** 点保存：模式没变直接保存；变了先弹二次确认。 */
+function saveAttachmentSetting(): void {
+  const original = attachmentStorage.setting?.mode ?? 'LOCAL_FS'
+  if (storageDraft.value.mode !== original) {
+    pendingMode.value = storageDraft.value.mode
+    switchOpen.value = true
+    return
+  }
+  void commitAttachmentSetting()
+}
+
+async function commitAttachmentSetting(): Promise<void> {
+  switchOpen.value = false
+  pendingMode.value = null
+  await run(async () => {
+    const saved = await attachmentStorage.saveSetting({ ...storageDraft.value })
+    storageDraft.value = { ...saved }
+    notice.value = '附件存储方式已更新，仅对新附件生效'
+  })
+}
+
+async function doUploadAttachment(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  uploadBusy.value = true
+  await run(async () => {
+    await attachmentStorage.upload(file)
+    await attachmentStorage.loadAll()
+    notice.value = '附件已上传'
+  })
+  uploadBusy.value = false
+  input.value = ''
+}
+
+async function doRemoveAttachment(item: AttachmentItem): Promise<void> {
+  if (!window.confirm(`删除附件「${item.originalName}」？该操作不可撤销。`)) return
+  await run(async () => {
+    await attachmentStorage.remove(item.id)
+    notice.value = '附件已删除'
+  })
+}
+
+async function doDownloadAttachment(item: AttachmentItem): Promise<void> {
+  await run(async () => { await attachmentStorage.download(item.id, item.originalName) })
 }
 
 // ---- 身份源 ----
@@ -361,6 +501,7 @@ function editSetting(setting: InstanceSetting): void {
 }
 
 onMounted(() => loadSection(section.value))
+onUnmounted(() => persistence.cancelPolling())
 
 </script>
 
@@ -495,43 +636,273 @@ onMounted(() => loadSection(section.value))
         </div>
       </section>
 
-      <!-- 数据持久化 -->
-      <section v-else-if="section === 'persistence'" class="card">
-        <div class="card__head">
-          <h2 class="card__title">数据持久化</h2>
-          <span class="card__hint">实例数据的存储路径与备份策略</span>
-        </div>
-        <div class="card__body form-stack">
-          <div class="policy">
-            <div class="policy__text">
-              <span class="policy__name">启用持久化存储</span>
-              <span class="policy__hint">关闭后仅在当前会话内保留数据。</span>
+      <!-- 数据持久化：概览 / 策略 / 备份历史 -->
+      <section v-else-if="section === 'persistence'" class="snapshot-page">
+        <div class="card">
+          <div class="card__head">
+            <div>
+              <h2 class="card__title">数据快照概览</h2>
+              <span class="card__hint">业务数据由数据库持久化；这里管理整库快照、备份计划与恢复</span>
             </div>
-            <button type="button" class="switch" :class="{ 'is-on': persistence.enabled }" role="switch" :aria-checked="persistence.enabled" aria-label="启用持久化存储" @click="persistence.enabled = !persistence.enabled">
-              <span class="switch__dot" />
+            <button class="btn btn-primary btn-sm" type="button"
+              :disabled="persistence.busy || persistence.status?.runningBackupId != null || persistence.status?.directoryWritable === false"
+              @click="doBackup">
+              {{ persistence.busy ? '执行中…' : '立即备份' }}
             </button>
           </div>
-          <label class="field">
-            <span>存储路径</span>
-            <input v-model="persistence.storagePath" class="control" type="text" placeholder="./data 或 /var/lib/aireview" />
-          </label>
-          <div class="policy">
-            <div class="policy__text">
-              <span class="policy__name">自动备份</span>
-              <span class="policy__hint">按周期生成数据快照。</span>
+          <div class="card__body">
+            <p v-if="persistence.status !== null && !persistence.status.directoryWritable" class="form-error">
+              备份目录不可写：{{ persistence.status.storagePath }}。请先在服务端创建目录并授权。
+            </p>
+            <div v-if="persistence.status !== null" class="snapshot-grid">
+              <div class="snapshot-stat"><span>数据库占用</span><strong>{{ formatBytes(persistence.status.databaseSizeBytes) }}</strong></div>
+              <div class="snapshot-stat"><span>业务表 / 行数</span><strong>{{ persistence.status.tables.length }} / {{ persistence.status.totalRows }}</strong></div>
+              <div class="snapshot-stat"><span>索引切片</span><strong>{{ persistence.status.indexChunks }}</strong></div>
+              <div class="snapshot-stat"><span>上次备份</span><strong>{{ persistence.status.lastBackup === null ? '尚无' : formatTime(persistence.status.lastBackup.finishedAt) }}</strong></div>
+              <div class="snapshot-stat"><span>下次自动备份</span><strong>{{ persistence.status.nextRunAt === null ? '未安排' : formatTime(persistence.status.nextRunAt) }}</strong></div>
             </div>
-            <button type="button" class="switch" :class="{ 'is-on': persistence.autoBackup }" role="switch" :aria-checked="persistence.autoBackup" aria-label="自动备份" @click="persistence.autoBackup = !persistence.autoBackup">
-              <span class="switch__dot" />
-            </button>
+            <p v-if="persistence.status !== null" class="snapshot-line">
+              备份目录 <code>{{ persistence.status.storagePath }}</code>
+              <span class="chip chip--outline">{{ persistence.status.directoryWritable ? '可写' : '不可写' }}</span>
+              <span v-if="!persistence.status.autoBackupEnabled" class="chip chip--outline">运维已暂停自动备份</span>
+            </p>
+            <p v-if="persistence.task !== null" class="task-line">
+              任务 {{ persistence.task.kind }}：{{ persistence.task.message }}
+              <span v-if="persistence.task.totalTables > 1">（{{ persistence.task.completedTables }}/{{ persistence.task.totalTables }} 张表）</span>
+            </p>
           </div>
-          <label class="field">
-            <span>备份保留天数</span>
-            <input v-model.number="persistence.retentionDays" class="control" type="number" min="1" max="3650" />
-          </label>
         </div>
-        <div class="card__foot">
-          <div class="spacer" />
-          <button class="btn btn-primary btn-sm" type="button" @click="savePersistence">保存配置</button>
+
+        <div class="card">
+          <div class="card__head">
+            <h2 class="card__title">备份策略</h2>
+            <span class="card__hint">仅对当前实例生效，保存后由服务端校验并规范化</span>
+          </div>
+          <form class="card__body form-stack" @submit.prevent="savePersistenceSetting">
+            <div class="policy">
+              <div class="policy__text">
+                <span class="policy__name">启用快照备份</span>
+                <span class="policy__hint">关闭后停止自动快照；业务数据仍由数据库持久化，不受影响。</span>
+              </div>
+              <button type="button" class="switch" :class="{ 'is-on': settingDraft.enabled }" role="switch"
+                :aria-checked="settingDraft.enabled" aria-label="启用快照备份"
+                @click="settingDraft.enabled = !settingDraft.enabled"><span class="switch__dot" /></button>
+            </div>
+            <label class="field">
+              <span>备份目录</span>
+              <input v-model="settingDraft.storagePath" class="control" type="text" placeholder="./data/backups 或 /var/lib/aireview/backups" />
+            </label>
+            <div class="policy">
+              <div class="policy__text">
+                <span class="policy__name">自动备份</span>
+                <span class="policy__hint">按下方周期生成整库快照，超出保留天数的归档会被清理。</span>
+              </div>
+              <button type="button" class="switch" :class="{ 'is-on': settingDraft.autoBackup }" role="switch"
+                :aria-checked="settingDraft.autoBackup" aria-label="自动备份"
+                @click="settingDraft.autoBackup = !settingDraft.autoBackup"><span class="switch__dot" /></button>
+            </div>
+            <label class="field">
+              <span>备份周期</span>
+              <select v-model="settingDraft.backupCron" class="control">
+                <option v-for="option in CRON_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
+                <option v-if="customCron" :value="settingDraft.backupCron">自定义：{{ settingDraft.backupCron }}</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>保留天数</span>
+              <input v-model.number="settingDraft.retentionDays" class="control" type="number" min="1" max="3650" />
+            </label>
+            <p class="modal__hint">归档内含密码哈希与访问令牌摘要，请只放在受控目录，勿外传。</p>
+            <div class="card__foot">
+              <div class="spacer" />
+              <button class="btn btn-primary btn-sm" type="submit">保存策略</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card__head">
+            <h2 class="card__title">备份历史</h2>
+            <span class="card__hint">共 {{ persistence.total }} 份归档</span>
+          </div>
+          <div class="card__body">
+            <p v-if="persistence.records.length === 0" class="panel-empty">还没有备份，点右上角「立即备份」生成第一份快照。</p>
+            <table v-else class="table">
+              <thead>
+                <tr><th>生成时间</th><th>来源</th><th>状态</th><th>大小</th><th>行数</th><th class="col-action">操作</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="record in persistence.records" :key="record.id">
+                  <td>{{ formatTime(record.startedAt) }}</td>
+                  <td>
+                    <span class="chip chip--outline">{{ record.triggerType === 'AUTO' ? '自动' : record.triggerType === 'PRE_RESTORE' ? '恢复前' : '手动' }}</span>
+                    <span v-if="record.keepForever" class="chip chip--accent">长期保留</span>
+                  </td>
+                  <td>
+                    <span :class="['chip', record.status === 'SUCCESS' ? 'chip--accent' : record.status === 'FAILED' ? 'chip--danger' : 'chip--outline']">{{ record.status }}</span>
+                    <span v-if="record.errorMessage" class="cell-muted" :title="record.errorMessage"> · {{ record.errorMessage }}</span>
+                  </td>
+                  <td>{{ formatBytes(record.sizeBytes) }}</td>
+                  <td>{{ record.rowCount || '—' }}</td>
+                  <td class="col-action">
+                    <template v-if="record.status === 'SUCCESS'">
+                      <button class="btn btn-ghost btn-sm" type="button" @click="doDownload(record)">下载</button>
+                      <button class="btn btn-ghost btn-sm" type="button" @click="doVerify(record.id)">校验</button>
+                      <button class="btn btn-ghost btn-sm" type="button" @click="openRestore(record)">恢复</button>
+                    </template>
+                    <button class="btn btn-ghost btn-sm" type="button" @click="doRemove(record)">删除</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div v-if="restoreOpen && restoreTarget !== null" class="modal-mask" @click.self="restoreOpen = false">
+          <div class="modal card" role="dialog" aria-modal="true" aria-labelledby="restore-title">
+            <div class="card__head">
+              <h2 id="restore-title" class="card__title">恢复数据快照</h2>
+              <button class="btn btn-ghost btn-sm" type="button" @click="restoreOpen = false">关闭</button>
+            </div>
+            <div class="card__body form-stack">
+              <p class="modal__hint">
+                将用 <code>{{ restoreTarget.fileName }}</code> 覆盖当前 18 张业务表。
+                系统会先自动生成一份「恢复前」快照作为回退点；恢复期间请勿操作实例。
+              </p>
+              <label class="field">
+                <span>输入 RESTORE 确认</span>
+                <input v-model="restoreConfirm" class="control mono" type="text" placeholder="RESTORE" />
+              </label>
+            </div>
+            <div class="card__foot">
+              <div class="spacer" />
+              <button class="btn btn-ghost btn-sm" type="button" @click="restoreOpen = false">取消</button>
+              <button class="btn btn-danger btn-sm" type="button" :disabled="restoreConfirm !== 'RESTORE' || persistence.busy" @click="doRestore">
+                确认恢复
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 附件存储：存储方式（仅管理员）/ 用量 / 附件列表 -->
+      <section v-else-if="section === 'attachments'" class="snapshot-page">
+        <div class="card">
+          <div class="card__head">
+            <div>
+              <h2 class="card__title">附件存储</h2>
+              <span class="card__hint">仅管理员可更改；切换方式只影响之后新上传的附件</span>
+            </div>
+          </div>
+          <form class="card__body form-stack" @submit.prevent="saveAttachmentSetting">
+            <div class="storage-mode-list" role="radiogroup" aria-label="附件存储方式">
+              <label class="storage-mode" :class="{ 'is-active': storageDraft.mode === 'LOCAL_FS' }">
+                <input v-model="storageDraft.mode" class="storage-mode__radio" type="radio" name="storage-mode" value="LOCAL_FS" />
+                <span class="storage-mode__body">
+                  <span class="storage-mode__name">本地文件系统 <span class="chip chip--outline">默认 · 推荐</span></span>
+                  <span class="storage-mode__hint">将新附件保存在服务器文件系统中。新实例默认使用这种方式</span>
+                </span>
+              </label>
+              <label class="storage-mode" :class="{ 'is-active': storageDraft.mode === 'DATABASE' }">
+                <input v-model="storageDraft.mode" class="storage-mode__radio" type="radio" name="storage-mode" value="DATABASE" />
+                <span class="storage-mode__body">
+                  <span class="storage-mode__name">数据库</span>
+                  <span class="storage-mode__hint">将附件二进制内容直接存入应用数据库。</span>
+                </span>
+              </label>
+            </div>
+            <label v-if="storageDraft.mode === 'LOCAL_FS'" class="field">
+              <span>附件目录</span>
+              <input v-model="storageDraft.localDir" class="control" type="text" placeholder="./data/attachments 或 /var/lib/aireview/attachments" />
+            </label>
+            <label class="field">
+              <span>单附件上限（MB）</span>
+              <input v-model.number="storageDraft.maxSizeMb" class="control" type="number" min="1" max="200" />
+            </label>
+            <p class="modal__hint">切换到数据库模式会让数据库与备份归档增大；已存附件仍按各自原方式读取，不受影响。</p>
+            <div class="card__foot">
+              <div class="spacer" />
+              <button class="btn btn-primary btn-sm" type="submit" :disabled="attachmentStorage.busy">保存存储方式</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card__head">
+            <div>
+              <h2 class="card__title">存储概览</h2>
+              <span class="card__hint">按附件自身记录的方式统计，不随当前配置变化</span>
+            </div>
+          </div>
+          <div class="card__body">
+            <p v-if="attachmentStorage.status !== null && !attachmentStorage.status.directoryWritable" class="form-error">
+              附件目录不可写：{{ attachmentStorage.status.localDir }}。请先在服务端创建目录并授权。
+            </p>
+            <div v-if="attachmentStorage.status !== null" class="snapshot-grid">
+              <div class="snapshot-stat"><span>当前方式</span><strong>{{ attachmentStorage.status.mode === 'DATABASE' ? '数据库' : '本地文件系统' }}</strong></div>
+              <div class="snapshot-stat"><span>文件系统</span><strong>{{ attachmentStorage.status.fsCount }} 个 · {{ formatBytes(attachmentStorage.status.fsBytes) }}</strong></div>
+              <div class="snapshot-stat"><span>数据库</span><strong>{{ attachmentStorage.status.dbCount }} 个 · {{ formatBytes(attachmentStorage.status.dbBytes) }}</strong></div>
+            </div>
+            <p v-if="attachmentStorage.status !== null" class="snapshot-line">
+              附件目录 <code>{{ attachmentStorage.status.localDir }}</code>
+              <span class="chip chip--outline">{{ attachmentStorage.status.directoryWritable ? '可写' : '不可写' }}</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__head">
+            <div>
+              <h2 class="card__title">我的附件</h2>
+              <span class="card__hint">可按当前存储方式上传；下载不区分存储位置</span>
+            </div>
+            <label class="btn btn-primary btn-sm" :class="{ 'is-disabled': uploadBusy }">
+              {{ uploadBusy ? '上传中…' : '上传附件' }}
+              <input type="file" class="visually-hidden" :disabled="uploadBusy" @change="doUploadAttachment" />
+            </label>
+          </div>
+          <div class="card__body">
+            <p v-if="attachmentStorage.items.length === 0" class="panel-empty">还没有附件，点右上角「上传附件」添加第一个。</p>
+            <table v-else class="table">
+              <thead>
+                <tr><th>文件名</th><th>大小</th><th>存储方式</th><th>上传时间</th><th>操作</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in attachmentStorage.items" :key="item.id">
+                  <td>{{ item.originalName }}</td>
+                  <td>{{ formatBytes(item.sizeBytes) }}</td>
+                  <td><span class="chip chip--outline">{{ item.storageMode === 'DATABASE' ? '数据库' : '文件系统' }}</span></td>
+                  <td>{{ formatTime(item.createdAt) }}</td>
+                  <td>
+                    <button class="btn btn-ghost btn-sm" type="button" @click="doDownloadAttachment(item)">下载</button>
+                    <button class="btn btn-danger btn-sm" type="button" @click="doRemoveAttachment(item)">删除</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div v-if="switchOpen && pendingMode !== null" class="modal-mask" @click.self="switchOpen = false">
+          <div class="modal card" role="dialog" aria-modal="true" aria-labelledby="switch-title">
+            <div class="card__head">
+              <h2 id="switch-title" class="card__title">{{ pendingMode === 'DATABASE' ? '切换到数据库存储？' : '切换到本地文件系统？' }}</h2>
+              <button class="btn btn-ghost btn-sm" type="button" @click="switchOpen = false">关闭</button>
+            </div>
+            <div class="card__body form-stack">
+              <p v-if="pendingMode === 'LOCAL_FS'" class="modal__hint">
+                将新附件保存在服务器文件系统中。新实例默认使用这种方式。注意：容器部署必须挂载持久卷到附件目录，否则重建后文件丢失；已存附件不受影响，仍按各自原方式读取。
+              </p>
+              <p v-else class="modal__hint">
+                将附件二进制内容直接存入应用数据库。注意：数据库体积与备份归档会增大，单附件上限 {{ storageDraft.maxSizeMb }}MB；已存附件不受影响，仍按各自原方式读取。
+              </p>
+            </div>
+            <div class="card__foot">
+              <div class="spacer" />
+              <button class="btn btn-ghost btn-sm" type="button" @click="switchOpen = false">取消</button>
+              <button class="btn btn-primary btn-sm" type="button" @click="commitAttachmentSetting">确认切换</button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -894,6 +1265,133 @@ onMounted(() => loadSection(section.value))
   color: var(--fg-muted);
   font-size: 12.5px;
   line-height: 1.6;
+}
+
+/* ---- 数据快照 ---- */
+.snapshot-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+}
+
+.snapshot-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+}
+
+.snapshot-stat span {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.snapshot-stat strong {
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-line,
+.task-line {
+  margin: var(--space-3) 0 0;
+  color: var(--fg-muted);
+  font-size: 12.5px;
+}
+
+.task-line {
+  color: var(--accent);
+}
+
+.snapshot-line code {
+  font-family: var(--font-mono, monospace);
+}
+
+.btn-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.storage-mode-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.storage-mode {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+
+.storage-mode:hover {
+  border-color: var(--border-strong);
+}
+
+.storage-mode.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.storage-mode__radio {
+  flex: none;
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+
+.storage-mode__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.storage-mode__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.storage-mode__hint {
+  color: var(--fg-muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.btn.is-disabled {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 @media (max-width: 720px) {

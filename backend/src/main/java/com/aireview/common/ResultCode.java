@@ -10,6 +10,7 @@ public enum ResultCode {
     LOGIN_FAILED(401, "用户名或密码错误"),
     FORBIDDEN(403, "无权访问该资源"),
     NOT_FOUND(404, "资源不存在"),
+    CONFLICT(409, "操作冲突，请稍后重试"),
     USERNAME_TAKEN(409, "用户名已被占用"),
     LOCKED(423, "账号已锁定，请稍后再试"),
     TOO_MANY_REQUESTS(429, "请求过于频繁，请稍后再试"),

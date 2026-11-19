@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aireview.mapper.PersistenceStatMapper">
+
+    <!-- 表名来自后端白名单常量，#{} 绑定，不接受请求参数 -->
+    <select id="selectTableStats" resultType="com.aireview.dto.TableStatVO">
+        SELECT table_name AS tableName,
+               table_rows AS rowEstimate,
+               COALESCE(data_length + index_length, 0) AS sizeBytes
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+          AND table_name IN
+        <foreach collection="tables" item="t" open="(" separator="," close=")">#{t}</foreach>
+        ORDER BY (data_length + index_length) DESC
+    </select>
+</mapper>

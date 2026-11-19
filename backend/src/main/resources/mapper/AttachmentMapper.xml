@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aireview.mapper.AttachmentMapper">
+
+    <select id="selectUsageByMode" resultType="java.util.LinkedHashMap">
+        SELECT storage_mode AS storageMode,
+               COUNT(*) AS itemCount,
+               COALESCE(SUM(size_bytes), 0) AS totalBytes
+        FROM attachment
+        GROUP BY storage_mode
+    </select>
+</mapper>

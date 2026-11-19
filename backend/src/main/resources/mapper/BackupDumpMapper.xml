@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  快照导出/导入。表名只用于 <choose> 分支匹配，实际 SQL 中的表名全部写死；
+  行值一律通过 #{} 绑定。新增业务表时须同步 BackupTables.ALL 与本文件三组语句。
+-->
+<mapper namespace="com.aireview.mapper.BackupDumpMapper">
+
+    <select id="selectRows" resultType="map">
+        <choose>
+            <when test="table == 'user'">
+                SELECT id, username, password_hash AS passwordHash, nickname, phone, email,
+                       real_name AS realName, description, avatar_url AS avatarUrl,
+                       token_version AS tokenVersion, status, fail_count AS failCount,
+                       lock_until AS lockUntil, created_at AS createdAt, updated_at AS updatedAt
+                FROM `user` ORDER BY id
+            </when>
+            <when test="table == 'sys_role'">
+                SELECT id, role_code AS roleCode, role_name AS roleName FROM sys_role ORDER BY id
+            </when>
+            <when test="table == 'sys_permission'">
+                SELECT id, perm_code AS permCode, perm_name AS permName FROM sys_permission ORDER BY id
+            </when>
+            <when test="table == 'sys_user_role'">
+                SELECT user_id AS userId, role_id AS roleId FROM sys_user_role ORDER BY user_id, role_id
+            </when>
+            <when test="table == 'sys_role_permission'">
+                SELECT role_id AS roleId, perm_id AS permId FROM sys_role_permission ORDER BY role_id, perm_id
+            </when>
+            <when test="table == 'sys_user_sso_binding'">
+                SELECT id, user_id AS userId, sso_provider AS ssoProvider, sso_subject AS ssoSubject,
+                       created_at AS createdAt FROM sys_user_sso_binding ORDER BY id
+            </when>
+            <when test="table == 'sys_login_log'">
+                SELECT id, username, login_type AS loginType, success, client_ip AS clientIp,
+                       user_agent AS userAgent, message, created_at AS createdAt
+                FROM sys_login_log ORDER BY id
+            </when>
+            <when test="table == 'note'">
+                SELECT id, user_id AS userId, title, content, is_pinned AS isPinned,
+                       is_archived AS isArchived, content_version AS contentVersion,
+                       index_status AS indexStatus, index_error AS indexError,
+                       retry_count AS retryCount, created_at AS createdAt, updated_at AS updatedAt
+                FROM note ORDER BY id
+            </when>
+            <when test="table == 'document'">
+                SELECT id, user_id AS userId, file_name AS fileName, content, file_size AS fileSize,
+                       content_version AS contentVersion, index_status AS indexStatus,
+                       index_error AS indexError, retry_count AS retryCount,
+                       created_at AS createdAt, updated_at AS updatedAt
+                FROM document ORDER BY id
+            </when>
+            <when test="table == 'document_chunk'">
+                SELECT id, user_id AS userId, resource_type AS resourceType, resource_id AS resourceId,
+                       content_version AS contentVersion, chunk_index AS chunkIndex, content,
+                       position_start AS positionStart, position_end AS positionEnd,
+                       content_hash AS contentHash, created_at AS createdAt
+                FROM document_chunk ORDER BY id
+            </when>
+            <when test="table == 'knowledge_base'">
+                SELECT id, owner_id AS ownerId, name, description, created_at AS createdAt,
+                       updated_at AS updatedAt FROM knowledge_base ORDER BY id
+            </when>
+            <when test="table == 'knowledge_base_member'">
+                SELECT id, knowledge_base_id AS knowledgeBaseId, user_id AS userId,
+                       member_role AS memberRole, created_at AS createdAt
+                FROM knowledge_base_member ORDER BY id
+            </when>
+            <when test="table == 'knowledge_base_resource'">
+                SELECT id, knowledge_base_id AS knowledgeBaseId, resource_type AS resourceType,
+                       resource_id AS resourceId, created_at AS createdAt
+                FROM knowledge_base_resource ORDER BY id
+            </when>
+            <when test="table == 'user_setting'">
+                SELECT id, user_id AS userId, `key` AS settingKey, value FROM user_setting ORDER BY id
+            </when>
+            <when test="table == 'personal_access_token'">
+                SELECT id, uid, user_id AS userId, token_hash AS tokenHash, description,
+                       created_at AS createdAt, expires_ts AS expiresTs
+                FROM personal_access_token ORDER BY id
+            </when>
+            <when test="table == 'user_identity'">
+                SELECT id, user_id AS userId, provider, extern_uid AS externUid,
+                       created_at AS createdAt, updated_at AS updatedAt
+                FROM user_identity ORDER BY id
+            </when>
+            <when test="table == 'identity_provider'">
+                SELECT id, uid, name, type, identifier_filter AS identifierFilter, config
+                FROM identity_provider ORDER BY id
+            </when>
+            <when test="table == 'instance_setting'">
+                SELECT id, name, value, description FROM instance_setting ORDER BY id
+            </when>
+            <when test="table == 'attachment'">
+                SELECT id, user_id AS userId, original_name AS originalName,
+                       content_type AS contentType, size_bytes AS sizeBytes, sha256,
+                       storage_mode AS storageMode, storage_key AS storageKey,
+                       created_at AS createdAt
+                FROM attachment ORDER BY id
+            </when>
+            <when test="table == 'attachment_blob'">
+                <!-- 二进制交给通用 normalize 走 Base64，恢复时用 FROM_BASE64 还原 -->
+                SELECT attachment_id AS attachmentId, content FROM attachment_blob ORDER BY attachment_id
+            </when>
+        </choose>
+    </select>
+
+    <delete id="deleteRows">
+        <choose>
+            <when test="table == 'user'">DELETE FROM `user`</when>
+            <when test="table == 'sys_role'">DELETE FROM sys_role</when>
+            <when test="table == 'sys_permission'">DELETE FROM sys_permission</when>
+            <when test="table == 'sys_user_role'">DELETE FROM sys_user_role</when>
+            <when test="table == 'sys_role_permission'">DELETE FROM sys_role_permission</when>
+            <when test="table == 'sys_user_sso_binding'">DELETE FROM sys_user_sso_binding</when>
+            <when test="table == 'sys_login_log'">DELETE FROM sys_login_log</when>
+            <when test="table == 'note'">DELETE FROM note</when>
+            <when test="table == 'document'">DELETE FROM document</when>
+            <when test="table == 'document_chunk'">DELETE FROM document_chunk</when>
+            <when test="table == 'knowledge_base'">DELETE FROM knowledge_base</when>
+            <when test="table == 'knowledge_base_member'">DELETE FROM knowledge_base_member</when>
+            <when test="table == 'knowledge_base_resource'">DELETE FROM knowledge_base_resource</when>
+            <when test="table == 'user_setting'">DELETE FROM user_setting</when>
+            <when test="table == 'personal_access_token'">DELETE FROM personal_access_token</when>
+            <when test="table == 'user_identity'">DELETE FROM user_identity</when>
+            <when test="table == 'identity_provider'">DELETE FROM identity_provider</when>
+            <when test="table == 'instance_setting'">DELETE FROM instance_setting</when>
+            <when test="table == 'attachment'">DELETE FROM attachment</when>
+            <when test="table == 'attachment_blob'">DELETE FROM attachment_blob</when>
+        </choose>
+    </delete>
+
+    <insert id="insertRows">
+        <choose>
+            <when test="table == 'user'">
+                INSERT INTO `user` (id, username, password_hash, nickname, phone, email, real_name,
+                    description, avatar_url, token_version, status, fail_count, lock_until, created_at, updated_at) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.username}, #{r.passwordHash}, #{r.nickname}, #{r.phone}, #{r.email},
+                     #{r.realName}, #{r.description}, #{r.avatarUrl}, #{r.tokenVersion}, #{r.status},
+                     #{r.failCount}, #{r.lockUntil}, #{r.createdAt}, #{r.updatedAt})
+                </foreach>
+            </when>
+            <when test="table == 'sys_role'">
+                INSERT INTO sys_role (id, role_code, role_name) VALUES
+                <foreach collection="rows" item="r" separator=",">(#{r.id}, #{r.roleCode}, #{r.roleName})</foreach>
+            </when>
+            <when test="table == 'sys_permission'">
+                INSERT INTO sys_permission (id, perm_code, perm_name) VALUES
+                <foreach collection="rows" item="r" separator=",">(#{r.id}, #{r.permCode}, #{r.permName})</foreach>
+            </when>
+            <when test="table == 'sys_user_role'">
+                INSERT INTO sys_user_role (user_id, role_id) VALUES
+                <foreach collection="rows" item="r" separator=",">(#{r.userId}, #{r.roleId})</foreach>
+            </when>
+            <when test="table == 'sys_role_permission'">
+                INSERT INTO sys_role_permission (role_id, perm_id) VALUES
+                <foreach collection="rows" item="r" separator=",">(#{r.roleId}, #{r.permId})</foreach>
+            </when>
+            <when test="table == 'sys_user_sso_binding'">
+                INSERT INTO sys_user_sso_binding (id, user_id, sso_provider, sso_subject, created_at) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.userId}, #{r.ssoProvider}, #{r.ssoSubject}, #{r.createdAt})
+                </foreach>
+            </when>
+            <when test="table == 'sys_login_log'">
+                INSERT INTO sys_login_log (id, username, login_type, success, client_ip, user_agent, message, created_at) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.username}, #{r.loginType}, #{r.success}, #{r.clientIp}, #{r.userAgent}, #{r.message}, #{r.createdAt})
+                </foreach>
+            </when>
+            <when test="table == 'note'">
+                INSERT INTO note (id, user_id, title, content, is_pinned, is_archived, content_version,
+                    index_status, index_error, retry_count, created_at, updated_at) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.userId}, #{r.title}, #{r.content}, #{r.isPinned}, #{r.isArchived},
+                     #{r.contentVersion}, #{r.indexStatus}, #{r.indexError}, #{r.retryCount},
+                     #{r.createdAt}, #{r.updatedAt})
+                </foreach>
+            </when>
+            <when test="table == 'document'">
+                INSERT INTO document (id, user_id, file_name, content, file_size, content_version,
+                    index_status, index_error, retry_count, created_at, updated_at) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.userId}, #{r.fileName}, #{r.content}, #{r.fileSize},
+                     #{r.contentVersion}, #{r.indexStatus}, #{r.indexError}, #{r.retryCount},
+                     #{r.createdAt}, #{r.updatedAt})
+                </foreach>
+            </when>
+            <when test="table == 'document_chunk'">
+                INSERT INTO document_chunk (id, user_id, resource_type, resource_id, content_version,
+                    chunk_index, content, position_start, position_end, content_hash, created_at) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.userId}, #{r.resourceType}, #{r.resourceId}, #{r.contentVersion},
+                     #{r.chunkIndex}, #{r.content}, #{r.positionStart}, #{r.positionEnd},
+                     #{r.contentHash}, #{r.createdAt})
+                </foreach>
+            </when>
+            <when test="table == 'knowledge_base'">
+                INSERT INTO knowledge_base (id, owner_id, name, description, created_at, updated_at) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.ownerId}, #{r.name}, #{r.description}, #{r.createdAt}, #{r.updatedAt})
+                </foreach>
+            </when>
+            <when test="table == 'knowledge_base_member'">
+                INSERT INTO knowledge_base_member (id, knowledge_base_id, user_id, member_role, created_at) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.knowledgeBaseId}, #{r.userId}, #{r.memberRole}, #{r.createdAt})
+                </foreach>
+            </when>
+            <when test="table == 'knowledge_base_resource'">
+                INSERT INTO knowledge_base_resource (id, knowledge_base_id, resource_type, resource_id, created_at) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.knowledgeBaseId}, #{r.resourceType}, #{r.resourceId}, #{r.createdAt})
+                </foreach>
+            </when>
+            <when test="table == 'user_setting'">
+                INSERT INTO user_setting (id, user_id, `key`, value) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.userId}, #{r.settingKey}, #{r.value})
+                </foreach>
+            </when>
+            <when test="table == 'personal_access_token'">
+                INSERT INTO personal_access_token (id, uid, user_id, token_hash, description, created_at, expires_ts) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.uid}, #{r.userId}, #{r.tokenHash}, #{r.description}, #{r.createdAt}, #{r.expiresTs})
+                </foreach>
+            </when>
+            <when test="table == 'user_identity'">
+                INSERT INTO user_identity (id, user_id, provider, extern_uid, created_at, updated_at) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.userId}, #{r.provider}, #{r.externUid}, #{r.createdAt}, #{r.updatedAt})
+                </foreach>
+            </when>
+            <when test="table == 'identity_provider'">
+                INSERT INTO identity_provider (id, uid, name, type, identifier_filter, config) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.uid}, #{r.name}, #{r.type}, #{r.identifierFilter}, #{r.config})
+                </foreach>
+            </when>
+            <when test="table == 'instance_setting'">
+                INSERT INTO instance_setting (id, name, value, description) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.name}, #{r.value}, #{r.description})
+                </foreach>
+            </when>
+            <when test="table == 'attachment'">
+                INSERT INTO attachment (id, user_id, original_name, content_type, size_bytes, sha256,
+                    storage_mode, storage_key, created_at) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.userId}, #{r.originalName}, #{r.contentType}, #{r.sizeBytes},
+                     #{r.sha256}, #{r.storageMode}, #{r.storageKey}, #{r.createdAt})
+                </foreach>
+            </when>
+            <when test="table == 'attachment_blob'">
+                <!-- content 在归档里是 Base64 文本，写回 LONGBLOB 前必须还原 -->
+                INSERT INTO attachment_blob (attachment_id, content) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.attachmentId}, FROM_BASE64(#{r.content}))
+                </foreach>
+            </when>
+        </choose>
+    </insert>
+</mapper>

@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 
-type AdminSection = 'users' | 'policies' | 'rag' | 'persistence' | 'providers' | 'settings'
+type AdminSection = 'users' | 'policies' | 'rag' | 'persistence' | 'attachments' | 'providers' | 'settings'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -15,6 +15,7 @@ const adminItems: { id: AdminSection; label: string; icon: string }[] = [
   { id: 'policies', label: '访问与策略', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' },
   { id: 'rag', label: 'RAG 系统', icon: 'M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z' },
   { id: 'persistence', label: '数据持久化', icon: 'M4 7c0-2 2.7-3 8-3s8 1 8 3-2.7 3-8 3-8-1-8-3zM4 7v5c0 2 2.7 3 8 3s8-1 8-3V7M4 12v5c0 2 2.7 3 8 3s8-1 8-3v-5' },
+  { id: 'attachments', label: '附件存储', icon: 'M15 7h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3M9 7l1.5-3h3L15 7M9 13h6M9 16h4' },
   { id: 'providers', label: '身份源', icon: 'M9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4' },
   { id: 'settings', label: '原始设置', icon: 'M4 6h16M4 12h16M4 18h16M8 4v4M16 10v4M10 16v4' },
 ]
