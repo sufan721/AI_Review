@@ -4,7 +4,12 @@ import { useRoute } from 'vue-router'
 import { adminApi, identityProviderApi, instanceSettingApi } from '../api/admin'
 import { useAuthStore } from '../stores/auth'
 import { CRON_OPTIONS, usePersistenceStore } from '../stores/persistence'
+import { useAttachmentStorageStore } from '../stores/attachmentStorage'
 import type { BackupRecord, PersistenceSetting } from '../types/persistence'
+import type {
+  AttachmentItem,
+  AttachmentStorageSetting,
+} from '../types/attachmentStorage'
 import type {
   AdminUser,
   GeneralSetting,
@@ -14,14 +19,15 @@ import type {
   RagConfig,
 } from '../types/admin'
 
-type Section = 'users' | 'policies' | 'rag' | 'persistence' | 'providers' | 'settings'
+type Section = 'users' | 'policies' | 'rag' | 'persistence' | 'attachments' | 'providers' | 'settings'
 type RoleChoice = 'ROLE_ADMIN' | 'ROLE_USER'
 
-const SECTION_IDS: Section[] = ['users', 'policies', 'rag', 'persistence', 'providers', 'settings']
+const SECTION_IDS: Section[] = ['users', 'policies', 'rag', 'persistence', 'attachments', 'providers', 'settings']
 
 const route = useRoute()
 const auth = useAuthStore()
 const persistence = usePersistenceStore()
+const attachmentStorage = useAttachmentStorageStore()
 
 // 分区由左侧全站侧边栏的链接驱动（/admin?section=xxx），页面内不再放第二层侧栏
 const section = computed<Section>(() => {
@@ -47,6 +53,7 @@ const sectionTitles: Record<Section, { title: string; sub: string }> = {
   policies: { title: '访问与策略', sub: '控制该实例的注册、登录、资料编辑和日历默认行为' },
   rag: { title: 'RAG 系统', sub: '配置检索增强生成服务的 API 接入' },
   persistence: { title: '数据持久化', sub: '管理数据快照的目录、周期、历史与恢复' },
+  attachments: { title: '附件存储', sub: '选择新附件的保存位置：本地文件系统或应用数据库' },
   providers: { title: '身份源', sub: '管理 OIDC / SSO 身份提供商' },
   settings: { title: '原始设置', sub: '实例设置键值表，同名 key 会被覆盖' },
 }
@@ -72,6 +79,7 @@ function loadSection(next: Section): void {
   else if (next === 'policies') void loadGeneral()
   else if (next === 'rag') void loadRag()
   else if (next === 'persistence') void loadPersistencePanel()
+  else if (next === 'attachments') void loadAttachmentStoragePanel()
   else if (next === 'providers') void loadProviders()
   else void loadSettings()
 }
@@ -346,6 +354,69 @@ function formatTime(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value.includes('T') ? value : value.replace(' ', 'T'))
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN')
+}
+
+// ---- 附件存储 ----
+const storageDraft = ref<AttachmentStorageSetting>({
+  mode: 'LOCAL_FS', localDir: './data/attachments', maxSizeMb: 20,
+})
+/** 保存前待确认的模式切换：null 表示当前保存不改变模式，无需弹窗。 */
+const pendingMode = ref<'LOCAL_FS' | 'DATABASE' | null>(null)
+const switchOpen = ref(false)
+const uploadBusy = ref(false)
+
+async function loadAttachmentStoragePanel(): Promise<void> {
+  await run(async () => {
+    await attachmentStorage.loadAll()
+    if (attachmentStorage.setting !== null) storageDraft.value = { ...attachmentStorage.setting }
+  })
+}
+
+/** 点保存：模式没变直接保存；变了先弹二次确认。 */
+function saveAttachmentSetting(): void {
+  const original = attachmentStorage.setting?.mode ?? 'LOCAL_FS'
+  if (storageDraft.value.mode !== original) {
+    pendingMode.value = storageDraft.value.mode
+    switchOpen.value = true
+    return
+  }
+  void commitAttachmentSetting()
+}
+
+async function commitAttachmentSetting(): Promise<void> {
+  switchOpen.value = false
+  pendingMode.value = null
+  await run(async () => {
+    const saved = await attachmentStorage.saveSetting({ ...storageDraft.value })
+    storageDraft.value = { ...saved }
+    notice.value = '附件存储方式已更新，仅对新附件生效'
+  })
+}
+
+async function doUploadAttachment(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  uploadBusy.value = true
+  await run(async () => {
+    await attachmentStorage.upload(file)
+    await attachmentStorage.loadAll()
+    notice.value = '附件已上传'
+  })
+  uploadBusy.value = false
+  input.value = ''
+}
+
+async function doRemoveAttachment(item: AttachmentItem): Promise<void> {
+  if (!window.confirm(`删除附件「${item.originalName}」？该操作不可撤销。`)) return
+  await run(async () => {
+    await attachmentStorage.remove(item.id)
+    notice.value = '附件已删除'
+  })
+}
+
+async function doDownloadAttachment(item: AttachmentItem): Promise<void> {
+  await run(async () => { await attachmentStorage.download(item.id, item.originalName) })
 }
 
 // ---- 身份源 ----
@@ -709,6 +780,127 @@ onUnmounted(() => persistence.cancelPolling())
               <button class="btn btn-danger btn-sm" type="button" :disabled="restoreConfirm !== 'RESTORE' || persistence.busy" @click="doRestore">
                 确认恢复
               </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 附件存储：存储方式（仅管理员）/ 用量 / 附件列表 -->
+      <section v-else-if="section === 'attachments'" class="snapshot-page">
+        <div class="card">
+          <div class="card__head">
+            <div>
+              <h2 class="card__title">附件存储</h2>
+              <span class="card__hint">仅管理员可更改；切换方式只影响之后新上传的附件</span>
+            </div>
+          </div>
+          <form class="card__body form-stack" @submit.prevent="saveAttachmentSetting">
+            <div class="storage-mode-list" role="radiogroup" aria-label="附件存储方式">
+              <label class="storage-mode" :class="{ 'is-active': storageDraft.mode === 'LOCAL_FS' }">
+                <input v-model="storageDraft.mode" class="storage-mode__radio" type="radio" name="storage-mode" value="LOCAL_FS" />
+                <span class="storage-mode__body">
+                  <span class="storage-mode__name">本地文件系统 <span class="chip chip--outline">默认 · 推荐</span></span>
+                  <span class="storage-mode__hint">将新附件保存在服务器文件系统中。新实例默认使用这种方式</span>
+                </span>
+              </label>
+              <label class="storage-mode" :class="{ 'is-active': storageDraft.mode === 'DATABASE' }">
+                <input v-model="storageDraft.mode" class="storage-mode__radio" type="radio" name="storage-mode" value="DATABASE" />
+                <span class="storage-mode__body">
+                  <span class="storage-mode__name">数据库</span>
+                  <span class="storage-mode__hint">将附件二进制内容直接存入应用数据库。</span>
+                </span>
+              </label>
+            </div>
+            <label v-if="storageDraft.mode === 'LOCAL_FS'" class="field">
+              <span>附件目录</span>
+              <input v-model="storageDraft.localDir" class="control" type="text" placeholder="./data/attachments 或 /var/lib/aireview/attachments" />
+            </label>
+            <label class="field">
+              <span>单附件上限（MB）</span>
+              <input v-model.number="storageDraft.maxSizeMb" class="control" type="number" min="1" max="200" />
+            </label>
+            <p class="modal__hint">切换到数据库模式会让数据库与备份归档增大；已存附件仍按各自原方式读取，不受影响。</p>
+            <div class="card__foot">
+              <div class="spacer" />
+              <button class="btn btn-primary btn-sm" type="submit" :disabled="attachmentStorage.busy">保存存储方式</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card__head">
+            <div>
+              <h2 class="card__title">存储概览</h2>
+              <span class="card__hint">按附件自身记录的方式统计，不随当前配置变化</span>
+            </div>
+          </div>
+          <div class="card__body">
+            <p v-if="attachmentStorage.status !== null && !attachmentStorage.status.directoryWritable" class="form-error">
+              附件目录不可写：{{ attachmentStorage.status.localDir }}。请先在服务端创建目录并授权。
+            </p>
+            <div v-if="attachmentStorage.status !== null" class="snapshot-grid">
+              <div class="snapshot-stat"><span>当前方式</span><strong>{{ attachmentStorage.status.mode === 'DATABASE' ? '数据库' : '本地文件系统' }}</strong></div>
+              <div class="snapshot-stat"><span>文件系统</span><strong>{{ attachmentStorage.status.fsCount }} 个 · {{ formatBytes(attachmentStorage.status.fsBytes) }}</strong></div>
+              <div class="snapshot-stat"><span>数据库</span><strong>{{ attachmentStorage.status.dbCount }} 个 · {{ formatBytes(attachmentStorage.status.dbBytes) }}</strong></div>
+            </div>
+            <p v-if="attachmentStorage.status !== null" class="snapshot-line">
+              附件目录 <code>{{ attachmentStorage.status.localDir }}</code>
+              <span class="chip chip--outline">{{ attachmentStorage.status.directoryWritable ? '可写' : '不可写' }}</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__head">
+            <div>
+              <h2 class="card__title">我的附件</h2>
+              <span class="card__hint">可按当前存储方式上传；下载不区分存储位置</span>
+            </div>
+            <label class="btn btn-primary btn-sm" :class="{ 'is-disabled': uploadBusy }">
+              {{ uploadBusy ? '上传中…' : '上传附件' }}
+              <input type="file" class="visually-hidden" :disabled="uploadBusy" @change="doUploadAttachment" />
+            </label>
+          </div>
+          <div class="card__body">
+            <p v-if="attachmentStorage.items.length === 0" class="panel-empty">还没有附件，点右上角「上传附件」添加第一个。</p>
+            <table v-else class="table">
+              <thead>
+                <tr><th>文件名</th><th>大小</th><th>存储方式</th><th>上传时间</th><th>操作</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in attachmentStorage.items" :key="item.id">
+                  <td>{{ item.originalName }}</td>
+                  <td>{{ formatBytes(item.sizeBytes) }}</td>
+                  <td><span class="chip chip--outline">{{ item.storageMode === 'DATABASE' ? '数据库' : '文件系统' }}</span></td>
+                  <td>{{ formatTime(item.createdAt) }}</td>
+                  <td>
+                    <button class="btn btn-ghost btn-sm" type="button" @click="doDownloadAttachment(item)">下载</button>
+                    <button class="btn btn-danger btn-sm" type="button" @click="doRemoveAttachment(item)">删除</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div v-if="switchOpen && pendingMode !== null" class="modal-mask" @click.self="switchOpen = false">
+          <div class="modal card" role="dialog" aria-modal="true" aria-labelledby="switch-title">
+            <div class="card__head">
+              <h2 id="switch-title" class="card__title">{{ pendingMode === 'DATABASE' ? '切换到数据库存储？' : '切换到本地文件系统？' }}</h2>
+              <button class="btn btn-ghost btn-sm" type="button" @click="switchOpen = false">关闭</button>
+            </div>
+            <div class="card__body form-stack">
+              <p v-if="pendingMode === 'LOCAL_FS'" class="modal__hint">
+                将新附件保存在服务器文件系统中。新实例默认使用这种方式。注意：容器部署必须挂载持久卷到附件目录，否则重建后文件丢失；已存附件不受影响，仍按各自原方式读取。
+              </p>
+              <p v-else class="modal__hint">
+                将附件二进制内容直接存入应用数据库。注意：数据库体积与备份归档会增大，单附件上限 {{ storageDraft.maxSizeMb }}MB；已存附件不受影响，仍按各自原方式读取。
+              </p>
+            </div>
+            <div class="card__foot">
+              <div class="spacer" />
+              <button class="btn btn-ghost btn-sm" type="button" @click="switchOpen = false">取消</button>
+              <button class="btn btn-primary btn-sm" type="button" @click="commitAttachmentSetting">确认切换</button>
             </div>
           </div>
         </div>
@@ -1128,6 +1320,78 @@ onUnmounted(() => persistence.cancelPolling())
 .btn-danger {
   color: var(--danger);
   border-color: var(--danger);
+}
+
+.storage-mode-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.storage-mode {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+
+.storage-mode:hover {
+  border-color: var(--border-strong);
+}
+
+.storage-mode.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.storage-mode__radio {
+  flex: none;
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+
+.storage-mode__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.storage-mode__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.storage-mode__hint {
+  color: var(--fg-muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.btn.is-disabled {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 @media (max-width: 720px) {

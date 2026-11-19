@@ -12,6 +12,9 @@ frontend/dist/
 **/target/
 *.class
 
+# 附件存储默认目录（LOCAL_FS 模式，运行期产生）
+backend/data/
+
 # Frontend dependencies and build outputs
 **/node_modules/
 **/dist/

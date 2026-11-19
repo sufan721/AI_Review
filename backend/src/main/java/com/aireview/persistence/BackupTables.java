@@ -30,7 +30,9 @@ public final class BackupTables {
         "personal_access_token",
         "user_identity",
         "identity_provider",
-        "instance_setting");
+        "instance_setting",
+        "attachment",
+        "attachment_blob");
 
     private BackupTables() {
     }

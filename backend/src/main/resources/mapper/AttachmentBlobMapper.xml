@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  附件二进制读写（DATABASE 模式）。表名与列名全部写死，行值一律通过 #{} 绑定，
+  不接受任何来自请求的表名/列名，避免 ${} 注入面。
+-->
+<mapper namespace="com.aireview.mapper.AttachmentBlobMapper">
+
+    <insert id="insertBlob">
+        INSERT INTO attachment_blob (attachment_id, content) VALUES (#{blob.attachmentId}, #{blob.content})
+    </insert>
+</mapper>

@@ -1,6 +1,7 @@
 package com.aireview.service;
 
 import com.aireview.dto.AccessSetting;
+import com.aireview.dto.AttachmentStorageSetting;
 import com.aireview.dto.GeneralSetting;
 import com.aireview.dto.InstanceSettingVO;
 import com.aireview.dto.PersistenceSetting;
@@ -38,4 +39,10 @@ public interface InstanceSettingService {
 
     /** 写入 PERSISTENCE 设置；先校验并规范化，仅管理员可调用。 */
     PersistenceSetting upsertPersistence(PersistenceSetting setting);
+
+    /** 读取 STORAGE（附件存储后端）设置；缺失或损坏时返回 {@link AttachmentStorageSetting#defaults()}。 */
+    AttachmentStorageSetting getAttachmentStorage();
+
+    /** 写入 STORAGE 设置；先校验并规范化，仅管理员可调用。 */
+    AttachmentStorageSetting upsertAttachmentStorage(AttachmentStorageSetting setting);
 }

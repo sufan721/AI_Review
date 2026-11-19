@@ -91,6 +91,17 @@
             <when test="table == 'instance_setting'">
                 SELECT id, name, value, description FROM instance_setting ORDER BY id
             </when>
+            <when test="table == 'attachment'">
+                SELECT id, user_id AS userId, original_name AS originalName,
+                       content_type AS contentType, size_bytes AS sizeBytes, sha256,
+                       storage_mode AS storageMode, storage_key AS storageKey,
+                       created_at AS createdAt
+                FROM attachment ORDER BY id
+            </when>
+            <when test="table == 'attachment_blob'">
+                <!-- 二进制交给通用 normalize 走 Base64，恢复时用 FROM_BASE64 还原 -->
+                SELECT attachment_id AS attachmentId, content FROM attachment_blob ORDER BY attachment_id
+            </when>
         </choose>
     </select>
 
@@ -114,6 +125,8 @@
             <when test="table == 'user_identity'">DELETE FROM user_identity</when>
             <when test="table == 'identity_provider'">DELETE FROM identity_provider</when>
             <when test="table == 'instance_setting'">DELETE FROM instance_setting</when>
+            <when test="table == 'attachment'">DELETE FROM attachment</when>
+            <when test="table == 'attachment_blob'">DELETE FROM attachment_blob</when>
         </choose>
     </delete>
 
@@ -229,6 +242,21 @@
                 INSERT INTO instance_setting (id, name, value, description) VALUES
                 <foreach collection="rows" item="r" separator=",">
                     (#{r.id}, #{r.name}, #{r.value}, #{r.description})
+                </foreach>
+            </when>
+            <when test="table == 'attachment'">
+                INSERT INTO attachment (id, user_id, original_name, content_type, size_bytes, sha256,
+                    storage_mode, storage_key, created_at) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.id}, #{r.userId}, #{r.originalName}, #{r.contentType}, #{r.sizeBytes},
+                     #{r.sha256}, #{r.storageMode}, #{r.storageKey}, #{r.createdAt})
+                </foreach>
+            </when>
+            <when test="table == 'attachment_blob'">
+                <!-- content 在归档里是 Base64 文本，写回 LONGBLOB 前必须还原 -->
+                INSERT INTO attachment_blob (attachment_id, content) VALUES
+                <foreach collection="rows" item="r" separator=",">
+                    (#{r.attachmentId}, FROM_BASE64(#{r.content}))
                 </foreach>
             </when>
         </choose>

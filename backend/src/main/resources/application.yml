@@ -8,6 +8,11 @@ spring:
     password: ${DB_PASSWORD:memo}
   jackson:
     time-zone: GMT+8
+  servlet:
+    multipart:
+      # 单附件 200MB + 余量；业务层 AttachmentStorageSetting.maxSizeMb 再做精确校验
+      max-file-size: 210MB
+      max-request-size: 210MB
   data:
     redis:
       host: ${REDIS_HOST:localhost}
