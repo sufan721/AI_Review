@@ -652,7 +652,7 @@ onUnmounted(() => persistence.cancelPolling())
           </div>
           <div class="card__body">
             <p v-if="persistence.status !== null && !persistence.status.directoryWritable" class="form-error">
-              备份目录不可写：{{ persistence.status.storagePath }}。请先在服务端创建目录并授权。
+              备份目录无法写入：{{ persistence.status.storagePath }}。请确认该路径是目录，且运行服务的账号对其有写权限。
             </p>
             <div v-if="persistence.status !== null" class="snapshot-grid">
               <div class="snapshot-stat"><span>数据库占用</span><strong>{{ formatBytes(persistence.status.databaseSizeBytes) }}</strong></div>
@@ -836,7 +836,7 @@ onUnmounted(() => persistence.cancelPolling())
           </div>
           <div class="card__body">
             <p v-if="attachmentStorage.status !== null && !attachmentStorage.status.directoryWritable" class="form-error">
-              附件目录不可写：{{ attachmentStorage.status.localDir }}。请先在服务端创建目录并授权。
+              附件目录无法写入：{{ attachmentStorage.status.localDir }}。请确认该路径是目录，且运行服务的账号对其有写权限。
             </p>
             <div v-if="attachmentStorage.status !== null" class="snapshot-grid">
               <div class="snapshot-stat"><span>当前方式</span><strong>{{ attachmentStorage.status.mode === 'DATABASE' ? '数据库' : '本地文件系统' }}</strong></div>

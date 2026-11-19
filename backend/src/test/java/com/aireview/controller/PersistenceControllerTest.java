@@ -50,6 +50,22 @@ class PersistenceControllerTest extends AbstractIntegrationTest {
         jdbcTemplate.execute("TRUNCATE TABLE `user`");
     }
 
+    /** 归档目录尚未创建时，状态位不应误报「不可写」——保存配置与真正备份都会自动建目录。 */
+    @Test
+    void statusTreatsMissingDirectoryAsWritableAndCreatesIt() throws Exception {
+        String admin = register("root");
+        Path fresh = backupDir.resolve("nested-not-created-yet");
+
+        saveSetting(admin, fresh.toString(), "0 0 3 * * *", false, 30);
+        Files.deleteIfExists(fresh);
+        assertFalse(Files.exists(fresh), "前置条件：目录已删除，模拟首次使用");
+
+        mockMvc.perform(get("/api/admin/persistence/status").header("Authorization", "Bearer " + admin))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.directoryWritable").value(true));
+        assertTrue(Files.isDirectory(fresh), "状态查询应能按需创建归档目录");
+    }
+
     @Test
     void backupVerifyAndRestoreRoundTrip() throws Exception {
         String admin = register("root");
