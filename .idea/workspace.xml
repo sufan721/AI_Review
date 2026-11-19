@@ -4,52 +4,7 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c3960515-eb3a-4c16-965e-44737532408f" name="更改" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/aireview/config/WebConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/aireview/config/WebConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/aireview/controller/AuthController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/aireview/controller/AuthController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/aireview/dto/EmailLoginRequest.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/aireview/dto/EmailSendRequest.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/aireview/dto/ForgotResetRequest.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/aireview/dto/ForgotSendCodeRequest.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/aireview/dto/RegisterRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/aireview/dto/RegisterRequest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/aireview/dto/SmsLoginRequest.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/aireview/dto/SmsSendRequest.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/aireview/entity/User.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/aireview/entity/User.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/aireview/security/CaptchaService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/aireview/security/CaptchaService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/aireview/service/AuthService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/aireview/service/AuthService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/aireview/service/impl/AuthServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/aireview/service/impl/AuthServiceImpl.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/resources/application.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/test/java/com/aireview/controller/AuthAdvancedTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/test/java/com/aireview/controller/AuthAdvancedTest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/test/java/com/aireview/controller/AuthControllerTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/test/java/com/aireview/controller/AuthControllerTest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/test/java/com/aireview/controller/DocumentControllerTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/test/java/com/aireview/controller/DocumentControllerTest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/test/java/com/aireview/controller/KnowledgeBaseControllerTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/test/java/com/aireview/controller/KnowledgeBaseControllerTest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/test/java/com/aireview/controller/NoteControllerTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/test/java/com/aireview/controller/NoteControllerTest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/test/java/com/aireview/index/IndexingIntegrationTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/test/java/com/aireview/index/IndexingIntegrationTest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/deploy/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/deploy/docker-compose.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/dev.ps1" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/sql/schema.sql" beforeDir="false" afterPath="$PROJECT_DIR$/docs/sql/schema.sql" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/App.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/App.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/api/auth.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/api/auth.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/components/knowledgeBase/KnowledgeBaseItem.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/knowledgeBase/KnowledgeBaseItem.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/components/knowledgeBase/ResourceItem.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/knowledgeBase/ResourceItem.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/components/layout/AppLayout.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/layout/AppLayout.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/components/note/NoteItem.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/note/NoteItem.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/main.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/main.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/router/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/router/index.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/stores/auth.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/stores/auth.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/styles/theme.css" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/styles/theme.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/types/auth.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/types/auth.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/views/DocumentListView.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/views/DocumentListView.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/views/ForgotPasswordView.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/views/ForgotPasswordView.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/views/KnowledgeBaseDetailView.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/views/KnowledgeBaseDetailView.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/views/KnowledgeBaseEditView.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/views/KnowledgeBaseEditView.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/views/LoginView.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/views/LoginView.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/views/NoteEditView.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/views/NoteEditView.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/views/RegisterView.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/views/RegisterView.vue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/start-docker.ps1" beforeDir="false" />
-    </list>
+    <list default="true" id="c3960515-eb3a-4c16-965e-44737532408f" name="更改" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -90,9 +45,12 @@
     "RunOnceActivity.go.formatter.settings.were.checked": "true",
     "RunOnceActivity.go.migrated.go.modules.settings": "true",
     "RunOnceActivity.go.modules.go.list.on.any.changes.was.set": "true",
-    "git-widget-placeholder": "feat/frontend-functions",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "main",
     "go.import.settings.migrated": "true",
     "go.sdk.automatically.set": "true",
+    "kotlin-language-version-configured": "true",
     "last_opened_file_path": "F:/coding/AI_Review",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
@@ -107,8 +65,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-PY-252.27397.106" />
-        <option value="bundled-python-sdk-4e2b1448bda8-9a97661f3031-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.27397.106" />
+        <option value="bundled-jdk-30f59d01ecdd-a9fadf26ba24-intellij.indexing.shared.core-IU-262.12573.28" />
+        <option value="bundled-js-predefined-d6986cc7102b-4abd2a77f808-JavaScript-IU-262.12573.28" />
       </set>
     </attachedChunks>
   </component>
