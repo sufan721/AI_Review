@@ -42,6 +42,16 @@ ai-review:
     mail-enabled: ${AUTH_MAIL_ENABLED:false}
     # SSO 模拟 IdP 登录页在前端回跳的地址（带协议），用于演示完整 OIDC 回调
     frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+  persistence:
+    # 运维硬开关：关闭后后台配置的 autoBackup 不生效（应急止血）
+    auto-backup-enabled: ${PERSISTENCE_AUTO_BACKUP_ENABLED:true}
+    scheduler-enabled: ${PERSISTENCE_SCHEDULER_ENABLED:true}
+    redis-lock-enabled: ${PERSISTENCE_REDIS_LOCK_ENABLED:true}
+    default-dir: ${AIREVIEW_BACKUP_DIR:./data/backups}
+    check-interval-ms: ${PERSISTENCE_CHECK_INTERVAL_MS:60000}
+    worker-core: ${PERSISTENCE_WORKER_CORE:1}
+    worker-max: ${PERSISTENCE_WORKER_MAX:2}
+    worker-queue: ${PERSISTENCE_WORKER_QUEUE:4}
   index:
     chunk:
       max-size: ${INDEX_CHUNK_MAX_SIZE:800}

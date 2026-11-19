@@ -55,11 +55,3 @@ export type RagConfig = {
   apiKey: string
   model: string
 }
-
-/** 数据持久化配置（以 JSON 存入 instance_setting 的 PERSISTENCE 项）。 */
-export type PersistenceConfig = {
-  enabled: boolean
-  storagePath: string
-  autoBackup: boolean
-  retentionDays: number
-}

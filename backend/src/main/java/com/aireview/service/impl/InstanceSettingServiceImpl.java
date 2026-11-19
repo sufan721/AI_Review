@@ -5,13 +5,19 @@ import com.aireview.common.ResultCode;
 import com.aireview.dto.AccessSetting;
 import com.aireview.dto.GeneralSetting;
 import com.aireview.dto.InstanceSettingVO;
+import com.aireview.dto.PersistenceSetting;
 import com.aireview.entity.InstanceSetting;
 import com.aireview.mapper.InstanceSettingMapper;
 import com.aireview.security.RequireRole;
 import com.aireview.service.InstanceSettingService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +31,9 @@ public class InstanceSettingServiceImpl implements InstanceSettingService {
     /** 实例设置中两类业务 key（统一大写）。 */
     public static final String NAME_GENERAL = "GENERAL";
     public static final String NAME_ACCESS = "ACCESS";
+    public static final String NAME_PERSISTENCE = "PERSISTENCE";
 
+    private static final Logger log = LoggerFactory.getLogger(InstanceSettingServiceImpl.class);
     private final InstanceSettingMapper instanceSettingMapper;
 
     public InstanceSettingServiceImpl(InstanceSettingMapper instanceSettingMapper) {
@@ -103,6 +111,50 @@ public class InstanceSettingServiceImpl implements InstanceSettingService {
         String json = setting.toJson();
         upsert(NAME_ACCESS, json, "实例访问模式 PUBLIC/PRIVATE");
         return setting;
+    }
+
+    @Override
+    public PersistenceSetting getPersistence() {
+        InstanceSetting setting = find(NAME_PERSISTENCE);
+        if (setting == null || setting.getValue() == null || setting.getValue().isBlank()) {
+            return PersistenceSetting.defaults();
+        }
+        if (!PersistenceSetting.isValidJson(setting.getValue())) {
+            log.warn("instance_setting.PERSISTENCE 中的 JSON 已损坏，本次读取回退默认值");
+        }
+        return PersistenceSetting.fromJson(setting.getValue());
+    }
+
+    @Override
+    @Transactional
+    @RequireRole("ROLE_ADMIN")
+    public PersistenceSetting upsertPersistence(PersistenceSetting setting) {
+        if (setting == null) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "设置不能为空");
+        }
+        PersistenceSetting normalized;
+        try {
+            normalized = setting.normalize();
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, exception.getMessage());
+        }
+        if (normalized.enabled()) {
+            assertWritable(Path.of(normalized.storagePath()));
+        }
+        upsert(NAME_PERSISTENCE, normalized.toJson(), "数据快照备份策略");
+        return normalized;
+    }
+
+    /** 保存前验证目录可用，避免「配置成功但备份必然失败」。 */
+    private void assertWritable(Path directory) {
+        try {
+            Files.createDirectories(directory);
+            Path probe = Files.createTempFile(directory, ".aireview-write-test-", ".tmp");
+            Files.deleteIfExists(probe);
+        } catch (IOException | RuntimeException exception) {
+            throw new BusinessException(ResultCode.BAD_REQUEST,
+                "备份目录不可写：" + directory + "（" + exception.getMessage() + "）");
+        }
     }
 
     private InstanceSetting find(String name) {

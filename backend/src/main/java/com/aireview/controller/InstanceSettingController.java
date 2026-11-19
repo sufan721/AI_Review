@@ -4,6 +4,8 @@ import com.aireview.common.Result;
 import com.aireview.dto.AccessSetting;
 import com.aireview.dto.GeneralSetting;
 import com.aireview.dto.InstanceSettingVO;
+import com.aireview.dto.PersistenceSetting;
+import com.aireview.security.RequireRole;
 import com.aireview.service.InstanceSettingService;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
@@ -65,6 +67,19 @@ public class InstanceSettingController {
             request.forbidChangeUsername(),
             request.forbidChangeNickname());
         return Result.ok(instanceSettingService.upsertGeneral(setting));
+    }
+
+    /** 读取数据快照设置；仅管理员。 */
+    @GetMapping("/persistence")
+    public Result<PersistenceSetting> persistence() {
+        return Result.ok(instanceSettingService.getPersistence());
+    }
+
+    /** 保存数据快照设置；仅管理员，服务端校验并规范化路径/周期。 */
+    @PutMapping("/persistence")
+    @RequireRole("ROLE_ADMIN")
+    public Result<PersistenceSetting> updatePersistence(@RequestBody PersistenceSetting request) {
+        return Result.ok(instanceSettingService.upsertPersistence(request));
     }
 
     /** 读取访问模式；匿名可读，用于前端判断是否允许匿名浏览公开资源。 */

@@ -3,6 +3,7 @@ package com.aireview.service;
 import com.aireview.dto.AccessSetting;
 import com.aireview.dto.GeneralSetting;
 import com.aireview.dto.InstanceSettingVO;
+import com.aireview.dto.PersistenceSetting;
 import java.util.List;
 
 /**
@@ -31,4 +32,10 @@ public interface InstanceSettingService {
 
     /** 写入 ACCESS 设置；返回最新值。仅管理员可调用。 */
     AccessSetting upsertAccess(AccessSetting setting);
+
+    /** 读取 PERSISTENCE（快照备份）设置；缺失或损坏时返回 {@link PersistenceSetting#defaults()}。 */
+    PersistenceSetting getPersistence();
+
+    /** 写入 PERSISTENCE 设置；先校验并规范化，仅管理员可调用。 */
+    PersistenceSetting upsertPersistence(PersistenceSetting setting);
 }
