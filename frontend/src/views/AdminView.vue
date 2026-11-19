@@ -35,6 +35,11 @@ function isSelf(user: AdminUser): boolean {
   return user.id === currentUserId.value
 }
 
+/** 初始管理员（首位注册账号）：任何管理员都不能更新或删除，只能本人维护自己。 */
+function isInitialAdmin(user: AdminUser): boolean {
+  return user.initialAdmin === true
+}
+
 const sectionTitles: Record<Section, { title: string; sub: string }> = {
   users: { title: '成员管理', sub: '管理实例成员，调整角色、重置密码与用户名' },
   policies: { title: '访问与策略', sub: '控制该实例的注册、登录、资料编辑和日历默认行为' },
@@ -131,6 +136,10 @@ function userStatus(status: number): string {
 }
 
 function openEdit(user: AdminUser): void {
+  if (isInitialAdmin(user)) {
+    error.value = '初始管理员不可被其他管理员修改，只能由本人维护自己的资料与密码'
+    return
+  }
   if (isSelf(user)) {
     error.value = '不能通过成员管理修改自己的账号，请前往个人资料页'
     return
@@ -152,6 +161,10 @@ function closeEdit(): void {
 async function saveEdit(): Promise<void> {
   const target = editingUser.value
   if (target === null || savingEdit.value) return
+  if (isInitialAdmin(target)) {
+    error.value = '初始管理员不可被其他管理员修改，只能由本人维护自己的资料与密码'
+    return
+  }
   if (isSelf(target)) {
     error.value = '不能通过成员管理修改自己的账号，请前往个人资料页'
     return
@@ -185,6 +198,10 @@ async function saveEdit(): Promise<void> {
 }
 
 async function removeUser(user: AdminUser): Promise<void> {
+  if (isInitialAdmin(user)) {
+    error.value = '初始管理员不可删除，该账号是实例的原始管理员'
+    return
+  }
   if (isSelf(user)) {
     error.value = '不能删除自己的账号，请由其他管理员操作'
     return
@@ -379,7 +396,10 @@ onMounted(() => loadSection(section.value))
                 <div class="user-cell">
                   <span class="avatar avatar--sm">{{ (user.nickname || user.username).slice(0, 1).toUpperCase() }}</span>
                   <div class="user-cell__text">
-                    <span class="cell-strong">{{ user.nickname || user.username }}</span>
+                    <span class="cell-strong">
+                      {{ user.nickname || user.username }}
+                      <span v-if="isInitialAdmin(user)" class="chip chip--outline chip--inline">初始管理员</span>
+                    </span>
                     <span class="cell-muted">@{{ user.username }}</span>
                   </div>
                 </div>
@@ -397,6 +417,7 @@ onMounted(() => loadSection(section.value))
               </td>
               <td class="col-action">
                 <span v-if="isSelf(user)" class="chip chip--outline" title="请前往个人资料页修改自己的信息">当前账号</span>
+                <span v-else-if="isInitialAdmin(user)" class="chip chip--outline" title="初始管理员不可被其他管理员更新或删除">受保护</span>
                 <template v-else>
                   <button class="btn btn-ghost btn-sm" type="button" @click="openEdit(user)">更新</button>
                   <button class="btn btn-ghost btn-sm danger" type="button" @click="removeUser(user)">删除</button>
@@ -813,6 +834,16 @@ onMounted(() => loadSection(section.value))
 
 .cell-strong {
   font-weight: 500;
+}
+
+/* 行内「初始管理员」小标签，跟随昵称同行显示 */
+.chip--inline {
+  height: 19px;
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 11.5px;
+  font-weight: 400;
+  vertical-align: middle;
 }
 
 .cell-muted {

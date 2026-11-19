@@ -56,6 +56,22 @@ public interface UserMapper extends BaseMapper<User> {
     @Update("UPDATE `user` SET token_version = token_version + 1 WHERE id = #{userId}")
     int bumpTokenVersion(@Param("userId") Long userId);
 
+    /**
+     * 初始管理员（首位注册并持有 ROLE_ADMIN 的账号）的 id：取持有 ROLE_ADMIN 的最小 user.id。
+     *
+     * <p>首位注册用户在建库后必然是最小 id，且注册时即被授予 ADMIN，因此该值稳定指向
+     * 「初始管理员」。若历史上初始管理员已被降权/删除，则取当前最小 id 的 admin 兜底；
+     * 无任何 admin 时返回 null。
+     */
+    @Select("""
+        SELECT MIN(u.id)
+        FROM `user` u
+        JOIN sys_user_role ur ON u.id = ur.user_id
+        JOIN sys_role r ON ur.role_id = r.id
+        WHERE r.role_code = 'ROLE_ADMIN'
+        """)
+    Long selectInitialAdminId();
+
     /** 当前活跃（status=1）且持有 ROLE_ADMIN 的用户数，用于「最后一个 admin」保护。 */
     @Select("""
         SELECT COUNT(*)

@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 管理员用户管理接口：列出用户、授予/撤销 ADMIN、改状态、删号、重置密码、改用户名。
- * 全部需要 ROLE_ADMIN；写操作带「最后一个活跃 admin 保护」。
+ * 全部需要 ROLE_ADMIN；写操作带「初始管理员保护」与「最后一个活跃 admin 保护」。
  */
 @RestController
 @RequestMapping("/api/admin")
@@ -38,8 +38,10 @@ public class AdminController {
     @GetMapping("/users")
     @RequireRole("ROLE_ADMIN")
     public Result<List<AdminUserVO>> users() {
+        // 初始管理员只算一次，避免每行一次查询；无 admin 时为 null
+        Long initialAdminId = userMapper.selectInitialAdminId();
         List<AdminUserVO> users = userMapper.selectList(null).stream()
-            .map(u -> toVO(u, userMapper.selectRoleCodes(u.getId())))
+            .map(u -> toVO(u, userMapper.selectRoleCodes(u.getId()), initialAdminId))
             .toList();
         return Result.ok(users);
     }
@@ -48,7 +50,8 @@ public class AdminController {
     @RequireRole("ROLE_ADMIN")
     public Result<AdminUserVO> createUser(@Valid @RequestBody AdminCreateUserRequest request) {
         Long id = adminUserService.createUser(request.username(), request.password());
-        return Result.ok(toVO(userMapper.selectById(id), userMapper.selectRoleCodes(id)));
+        return Result.ok(toVO(userMapper.selectById(id), userMapper.selectRoleCodes(id),
+            userMapper.selectInitialAdminId()));
     }
 
     @PostMapping("/users/{id}/roles/admin")
@@ -98,9 +101,10 @@ public class AdminController {
         return Result.ok(null);
     }
 
-    private static AdminUserVO toVO(User user, List<String> roles) {
+    private static AdminUserVO toVO(User user, List<String> roles, Long initialAdminId) {
+        boolean initialAdmin = initialAdminId != null && initialAdminId.equals(user.getId());
         return new AdminUserVO(user.getId(), user.getUsername(), user.getNickname(),
-            user.getStatus(), roles == null ? List.of() : roles);
+            user.getStatus(), roles == null ? List.of() : roles, initialAdmin);
     }
 
     public record AdminCreateUserRequest(
