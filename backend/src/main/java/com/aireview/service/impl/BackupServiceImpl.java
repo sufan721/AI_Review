@@ -291,7 +291,7 @@ public class BackupServiceImpl implements BackupService {
         List<TableStatVO> tables = statMapper.selectTableStats(BackupTables.ALL);
         long size = tables.stream().mapToLong(stat -> stat.getSizeBytes() == null ? 0 : stat.getSizeBytes()).sum();
         long rows = tables.stream().mapToLong(stat -> stat.getRowEstimate() == null ? 0 : stat.getRowEstimate()).sum();
-        boolean writable = Files.isDirectory(root) && Files.isWritable(root);
+        boolean writable = isPrepared(root);
         BackupRecord running = recordMapper.selectRunning();
         BackupRecord last = recordMapper.selectOne(new LambdaQueryWrapper<BackupRecord>()
             .eq(BackupRecord::getStatus, "SUCCESS").orderByDesc(BackupRecord::getFinishedAt).last("LIMIT 1"));
@@ -306,6 +306,24 @@ public class BackupServiceImpl implements BackupService {
         return PersistenceStatusVO.of(setting.enabled(), root.toString(), writable, size, rows,
             chunkMapper.selectCount(null), tables, last == null ? null : toVO(last), nextRun,
             autoBackupEnabled, running == null ? null : running.getId());
+    }
+
+    /**
+     * 判定归档目录是否已就绪：能创建且能写入探针文件才算可写。
+     *
+     * <p>不能直接用 {@code Files.isDirectory(dir) && Files.isWritable(dir)}——目录尚未创建时
+     * 前者为 false，会被误判成「不可写」，而保存配置与真正备份时都会自动创建目录，
+     * 于是状态位与真实能力矛盾，前端还会禁用「立即备份」按钮。
+     */
+    private static boolean isPrepared(Path directory) {
+        try {
+            Files.createDirectories(directory);
+            Path probe = Files.createTempFile(directory, ".aireview-write-test-", ".tmp");
+            Files.deleteIfExists(probe);
+            return true;
+        } catch (IOException | RuntimeException exception) {
+            return false;
+        }
     }
 
     @Override
