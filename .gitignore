@@ -1,39 +1,92 @@
-./claude
-.worktrees/
-backend/target/
-frontend/node_modules/
-frontend/dist/
-.obsidian/
-# Local dependency caches
-.m2/
-**/.m2/
+# =====================================================================
+# AI_Review 忽略规则
+# 原则：只保留「团队共享」的配置（.idea/runConfigurations 下的启动配置），
+#       其余 IDE 本地文件、构建产物、依赖、密钥一律不入库。
+# =====================================================================
 
-# Java / Maven build outputs
-**/target/
-*.class
+# ---------------------------------------------------------------------
+# IDE：.idea 目录
+# 只放行 Run Configuration（一键启动等共享配置），其余全部忽略
+# ---------------------------------------------------------------------
+.idea/*
+!.idea/runConfigurations/
+!.idea/runConfigurations/*.xml
 
-# 附件存储默认目录（LOCAL_FS 模式，运行期产生）
-backend/data/
+# .idea 内明确排除的本地文件（双保险，防止上面的放行规则误带进来）
+.idea/workspace.xml
+.idea/usage.statistics.xml
+.idea/shelf/
+.idea/httpRequests/
+.idea/dataSources/
+.idea/dataSources.xml
+.idea/dataSources.local.xml
+.idea/dictionaries/
+.idea/tasks.xml
+.idea/gradle.xml
+*.iml
+*.ipr
+*.iws
+out/
 
-# Frontend dependencies and build outputs
-**/node_modules/
-**/dist/
+# 如需共享代码风格/检查规则，去掉下面两行的注释即可
+# !.idea/codeStyles/
+# !.idea/inspectionProfiles/
 
-# Local environment and secrets
+# VS Code
+.vscode/
+
+# ---------------------------------------------------------------------
+# 本地环境与密钥（只保留 .env.example 模板）
+# ---------------------------------------------------------------------
 .env
 .env.local
 .env.*.local
 !.env.example
+!.env.*.example
 
-# Logs and temporary files
+# 附件存储默认目录（LOCAL_FS 模式运行期产生）
+backend/data/
+
+# ---------------------------------------------------------------------
+# Java / Maven
+# ---------------------------------------------------------------------
+**/target/
+*.class
+*.jar
+*.war
+.mvn/wrapper/maven-wrapper.jar
+.m2/
+**/.m2/
+
+# ---------------------------------------------------------------------
+# 前端 / Node
+# ---------------------------------------------------------------------
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/.vite/
+**/coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+
+# ---------------------------------------------------------------------
+# 编辑器 / 工具本地数据
+# ---------------------------------------------------------------------
+.workbuddy/
+.claude/
+.worktrees/
+.obsidian/
+
+# ---------------------------------------------------------------------
+# 日志与临时文件
+# ---------------------------------------------------------------------
 *.log
 *.tmp
 *.swp
+*.swo
 .DS_Store
 Thumbs.db
-
-# WorkBuddy local working data (backups, memory)
-.workbuddy/
-
-# IDE metadata (.idea/ is tracked so run configs and project settings are shared)
-.vscode/
+desktop.ini
