@@ -133,36 +133,35 @@ class AdminManagementTest extends AbstractIntegrationTest {
 
     @Test
     void adminCannotOperateOnOwnAccount() throws Exception {
-        String adminToken = register("root");
-        register("bob");
-        long rootId = userId("root");
+        String rootToken = register("root");
+        String adminToken = register("bob");
         long bobId = userId("bob");
-        // 制造第二个管理员，排除「最后一个 admin 保护」的干扰
+        // 把 bob 提权成管理员；root 是初始管理员，自身拦截用 bob 验证
         mockMvc.perform(post("/api/admin/users/" + bobId + "/roles/admin")
-                .header("Authorization", "Bearer " + adminToken))
+                .header("Authorization", "Bearer " + rootToken))
             .andExpect(status().isOk());
 
         // 自己给自己降权 → 403
-        mockMvc.perform(delete("/api/admin/users/" + rootId + "/roles/admin")
+        mockMvc.perform(delete("/api/admin/users/" + bobId + "/roles/admin")
                 .header("Authorization", "Bearer " + adminToken))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.message").value("不能对自己降权，请由其他管理员操作"));
 
         // 自己禁用自己 → 403
-        mockMvc.perform(put("/api/admin/users/" + rootId + "/status?status=0")
+        mockMvc.perform(put("/api/admin/users/" + bobId + "/status?status=0")
                 .header("Authorization", "Bearer " + adminToken))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.message").value("不能对自己禁用，请由其他管理员操作"));
 
         // 自己删自己 → 403
-        mockMvc.perform(delete("/api/admin/users/" + rootId)
+        mockMvc.perform(delete("/api/admin/users/" + bobId)
                 .header("Authorization", "Bearer " + adminToken))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.message").value("不能对自己删除，请由其他管理员操作"));
 
         // 自己通过管理接口改密码 → 403（自助改密走 /api/auth/change-password）
         ObjectNode pwd = objectMapper.createObjectNode().put("newPassword", "Another123!");
-        mockMvc.perform(put("/api/admin/users/" + rootId + "/password")
+        mockMvc.perform(put("/api/admin/users/" + bobId + "/password")
                 .header("Authorization", "Bearer " + adminToken)
                 .contentType(APPLICATION_JSON)
                 .content(pwd.toString()))
@@ -170,13 +169,118 @@ class AdminManagementTest extends AbstractIntegrationTest {
             .andExpect(jsonPath("$.message").value("不能对自己改密码，请前往个人资料页修改"));
 
         // 自己通过管理接口改用户名 → 403（自助改资料走 /api/users/me）
-        ObjectNode uname = objectMapper.createObjectNode().put("newUsername", "root_new");
-        mockMvc.perform(put("/api/admin/users/" + rootId + "/username")
+        ObjectNode uname = objectMapper.createObjectNode().put("newUsername", "bob_new");
+        mockMvc.perform(put("/api/admin/users/" + bobId + "/username")
                 .header("Authorization", "Bearer " + adminToken)
                 .contentType(APPLICATION_JSON)
                 .content(uname.toString()))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.message").value("不能对自己改用户名，请前往个人资料页修改"));
+    }
+
+    @Test
+    void initialAdminIsImmuneToPromotedAdmins() throws Exception {
+        String rootToken = register("root");
+        String bobToken = register("bob");
+        long rootId = userId("root");
+        long bobId = userId("bob");
+
+        // bob 提权后拿到的新权限在旧 token 上即生效（角色实时查库）
+        mockMvc.perform(post("/api/admin/users/" + bobId + "/roles/admin")
+                .header("Authorization", "Bearer " + rootToken))
+            .andExpect(status().isOk());
+
+        String msgSuffix = "，该账号是实例的原始管理员，仅本人可维护自己的资料与密码";
+
+        // 删除初始管理员 → 403
+        mockMvc.perform(delete("/api/admin/users/" + rootId)
+                .header("Authorization", "Bearer " + bobToken))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value("初始管理员不可删除" + msgSuffix));
+
+        // 撤销初始管理员的 ADMIN → 403
+        mockMvc.perform(delete("/api/admin/users/" + rootId + "/roles/admin")
+                .header("Authorization", "Bearer " + bobToken))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value("初始管理员不可撤销管理员权限" + msgSuffix));
+
+        // 禁用初始管理员 → 403
+        mockMvc.perform(put("/api/admin/users/" + rootId + "/status?status=0")
+                .header("Authorization", "Bearer " + bobToken))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value("初始管理员不可禁用" + msgSuffix));
+
+        // 管理员重置初始管理员密码 → 403
+        ObjectNode pwd = objectMapper.createObjectNode().put("newPassword", "Hijacked123!");
+        mockMvc.perform(put("/api/admin/users/" + rootId + "/password")
+                .header("Authorization", "Bearer " + bobToken)
+                .contentType(APPLICATION_JSON)
+                .content(pwd.toString()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value("初始管理员不可重置密码" + msgSuffix));
+
+        // 管理员改初始管理员用户名 → 403
+        ObjectNode uname = objectMapper.createObjectNode().put("newUsername", "root_hacked");
+        mockMvc.perform(put("/api/admin/users/" + rootId + "/username")
+                .header("Authorization", "Bearer " + bobToken)
+                .contentType(APPLICATION_JSON)
+                .content(uname.toString()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value("初始管理员不可修改用户名" + msgSuffix));
+
+        // 初始管理员的账号与密码均未被改动，且仍是启用状态的管理员
+        mockMvc.perform(get("/api/admin/users").header("Authorization", "Bearer " + rootToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[?(@.username=='root')].status").value(1))
+            .andExpect(jsonPath("$.data[?(@.username=='root')].roles[0]").value("ROLE_ADMIN"))
+            .andExpect(jsonPath("$.data[?(@.username=='root')].initialAdmin").value(true))
+            .andExpect(jsonPath("$.data[?(@.username=='bob')].initialAdmin").value(false));
+
+        seedCaptcha();
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(APPLICATION_JSON)
+                .content(loginBody("root", PASSWORD)))
+            .andExpect(status().isOk());
+
+        // 被提权的管理员本身仍可被管理：初始管理员可以撤销 bob
+        mockMvc.perform(delete("/api/admin/users/" + bobId + "/roles/admin")
+                .header("Authorization", "Bearer " + rootToken))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void initialAdminCanStillMaintainOwnProfileAndPassword() throws Exception {
+        String rootToken = register("root");
+
+        // 自助改昵称与描述
+        ObjectNode profile = objectMapper.createObjectNode()
+            .put("displayName", "实例主人")
+            .put("description", "初始管理员");
+        mockMvc.perform(patch("/api/users/me")
+                .header("Authorization", "Bearer " + rootToken)
+                .contentType(APPLICATION_JSON)
+                .content(profile.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.displayName").value("实例主人"))
+            .andExpect(jsonPath("$.data.description").value("初始管理员"));
+
+        // 自助改密码：校验旧密码后即可改，不受「初始管理员保护」影响（该保护只针对管理接口）
+        ObjectNode pwd = objectMapper.createObjectNode()
+            .put("oldPassword", PASSWORD)
+            .put("newPassword", "RootOwn456!");
+        mockMvc.perform(post("/api/auth/change-password")
+                .header("Authorization", "Bearer " + rootToken)
+                .contentType(APPLICATION_JSON)
+                .content(pwd.toString()))
+            .andExpect(status().isOk());
+
+        // 改密后新密码可登录，说明初始管理员没有被锁死
+        seedCaptcha();
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(APPLICATION_JSON)
+                .content(loginBody("root", "RootOwn456!")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.accessToken").isNotEmpty());
     }
 
     @Test

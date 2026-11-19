@@ -31,6 +31,8 @@ export type AdminUser = {
   nickname: string | null
   status: number
   roles: string[]
+  /** 是否为实例的初始管理员（首位注册账号）：不可被其他管理员更新或删除。 */
+  initialAdmin: boolean
 }
 
 /** 实例访问与策略开关（对应后端 GeneralSetting）。 */

@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * 管理员用户管理 + 改密码 + 会话版本号端到端：
- * 首用户自动 ADMIN、最后一个 admin 保护、改密码后旧 JWT 失效。
+ * 首用户自动 ADMIN、初始管理员不可被其他管理员删除/降权/禁用、改密码后旧 JWT 失效。
  */
 class AdminUserControllerTest extends AbstractIntegrationTest {
 
@@ -47,49 +47,54 @@ class AdminUserControllerTest extends AbstractIntegrationTest {
         String token = register("root");
         mockMvc.perform(get("/api/admin/users").header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data").isArray());
+            .andExpect(jsonPath("$.data").isArray())
+            .andExpect(jsonPath("$.data[?(@.username=='root')].initialAdmin").value(true));
     }
 
     @Test
-    void lastAdminCannotBeRevokedOrDisabledOrDeleted() throws Exception {
-        String adminToken = register("root");
-        String userToken = register("bob");
+    void initialAdminCannotBeRemovedOrModifiedByAnotherAdmin() throws Exception {
+        String rootToken = register("root");
+        String bobToken = register("bob");
+        String carolToken = register("carol");
         long rootId = userId("root");
-
-        // 撤销唯一的 admin → 403
-        mockMvc.perform(delete("/api/admin/users/" + rootId + "/roles/admin")
-                .header("Authorization", "Bearer " + adminToken))
-            .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.message").value("实例必须保留至少一个管理员"));
-
-        // 禁用唯一的 admin → 403
-        mockMvc.perform(put("/api/admin/users/" + rootId + "/status?status=0")
-                .header("Authorization", "Bearer " + adminToken))
-            .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.message").value("实例必须保留至少一个管理员"));
-
-        // 删除唯一的 admin → 403
-        mockMvc.perform(delete("/api/admin/users/" + rootId)
-                .header("Authorization", "Bearer " + adminToken))
-            .andExpect(status().isForbidden());
-
-        // bob（此时仍是普通用户）不能调管理接口
-        mockMvc.perform(get("/api/admin/users").header("Authorization", "Bearer " + userToken))
-            .andExpect(status().isForbidden());
-
-        // 授权 bob 为第二个 admin 后，root 仍不能给自己降权（自我保护）
         long bobId = userId("bob");
-        mockMvc.perform(post("/api/admin/users/" + bobId + "/roles/admin")
-                .header("Authorization", "Bearer " + adminToken))
-            .andExpect(status().isOk());
-        mockMvc.perform(delete("/api/admin/users/" + rootId + "/roles/admin")
-                .header("Authorization", "Bearer " + adminToken))
-            .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.message").value("不能对自己降权，请由其他管理员操作"));
 
-        // 由另一个管理员 bob 操作则允许（角色实时查库，授权后旧 token 即可用）
+        // 普通用户（未提权）不能调管理接口
+        mockMvc.perform(get("/api/admin/users").header("Authorization", "Bearer " + carolToken))
+            .andExpect(status().isForbidden());
+
+        // 把 bob 提权成第二个管理员：此后 bob 也不能动初始管理员 root
+        mockMvc.perform(post("/api/admin/users/" + bobId + "/roles/admin")
+                .header("Authorization", "Bearer " + rootToken))
+            .andExpect(status().isOk());
+
+        // bob 撤销 root（初始管理员）的权限 → 403
         mockMvc.perform(delete("/api/admin/users/" + rootId + "/roles/admin")
-                .header("Authorization", "Bearer " + userToken))
+                .header("Authorization", "Bearer " + bobToken))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value(
+                "初始管理员不可撤销管理员权限，该账号是实例的原始管理员，仅本人可维护自己的资料与密码"));
+
+        // bob 删除 root → 403
+        mockMvc.perform(delete("/api/admin/users/" + rootId)
+                .header("Authorization", "Bearer " + bobToken))
+            .andExpect(status().isForbidden());
+
+        // bob 禁用 root → 403
+        mockMvc.perform(put("/api/admin/users/" + rootId + "/status?status=0")
+                .header("Authorization", "Bearer " + bobToken))
+            .andExpect(status().isForbidden());
+
+        // root 仍是启用状态的管理员
+        mockMvc.perform(get("/api/admin/users").header("Authorization", "Bearer " + rootToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[?(@.username=='root')].status").value(1))
+            .andExpect(jsonPath("$.data[?(@.username=='root')].initialAdmin").value(true))
+            .andExpect(jsonPath("$.data[?(@.username=='bob')].initialAdmin").value(false));
+
+        // 非初始管理员（bob）可以被初始管理员撤销
+        mockMvc.perform(delete("/api/admin/users/" + bobId + "/roles/admin")
+                .header("Authorization", "Bearer " + rootToken))
             .andExpect(status().isOk());
     }
 
